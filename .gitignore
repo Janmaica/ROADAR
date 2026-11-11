@@ -1,0 +1,38 @@
+# Gradle and Android build output
+.gradle/
+/build/
+**/build/
+/captures/
+.externalNativeBuild/
+.cxx/
+
+# Machine-specific Android SDK configuration
+local.properties
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+
+# VS Code temporary or machine-specific files
+.vscode/*.log
+.vscode/*.tmp
+*.code-workspace
+
+# OS/editor temporary files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Signing material and local secrets
+*.jks
+*.keystore
+*.p12
+*.pem
+*.key
+key.properties
+secrets.properties
+.env
+.env.*
+!.env.example
