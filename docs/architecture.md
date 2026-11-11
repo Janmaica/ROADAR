@@ -8,14 +8,19 @@ ROADAR is currently a single Android app module with one `ComponentActivity` and
 - `RoadarApp` owns the current screen selection, bottom navigation, system-back behavior, and a connectivity indicator backed by Android's validated-network state.
 - `ui/screens/` contains the home, detection, reports, map, and settings screens.
 - `ui/components/` contains reusable headers, status rows, cards, and empty states.
+- `ui/camera/` contains a lifecycle-scoped CameraX preview controller and a Compose `PreviewView` host. The controller currently binds only the preview use case.
 - `ui/theme/` contains ROADAR light and dark Material 3 color schemes and typography.
 - `ui/navigation/` contains the current screen destinations.
 
-The app does not currently have a navigation library, ViewModel, repository, persistence layer, camera integration, model runtime, GPS collection, or synchronization worker. For five top-level UI destinations, local Compose navigation state keeps the dependency graph small and the screen transitions explicit. Revisit this choice if deeper navigation or restored back stacks are introduced.
+The app does not currently have a navigation library, ViewModel, repository, persistence layer, model runtime, GPS collection, or synchronization worker. For five top-level UI destinations, local Compose navigation state keeps the dependency graph small and the screen transitions explicit. Revisit this choice if deeper navigation or restored back stacks are introduced.
 
 ## Current boundaries and data truth
 
-The screens are UI-only. Empty report and map states do not use fabricated records or coordinates. Detection metrics remain unavailable until inference is connected. The connectivity badge only describes the device's current validated internet connection; it does not imply that offline detection or synchronization exists.
+Camera permission is requested only when the user asks to enable the preview. The permission gate distinguishes a retryable denial from a denial that requires opening app settings. The CameraX `Preview` use case is bound to the activity lifecycle and unbound when the detection screen leaves composition. `PreviewView` uses `FILL_CENTER` and its compatible rendering mode to maintain a portrait preview across device rotations.
+
+The camera controller owns preview setup and teardown separately from the screen. A future `ImageAnalysis` use case can be added to the same lifecycle binding without coupling model processing to Compose or changing the preview host. No analyzer, image processing, recording, or frame persistence is active.
+
+Empty report and map states do not use fabricated records or coordinates. Detection metrics remain unavailable until inference is connected. The connectivity badge only describes the device's current validated internet connection; it does not imply that offline detection or synchronization exists.
 
 ## Proposed evolution
 

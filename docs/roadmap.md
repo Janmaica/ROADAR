@@ -9,17 +9,20 @@ The milestones below describe future work for the research project. Only the ini
 - Top-level navigation and a device connectivity indicator.
 - Clear, non-fabricated empty states for features not implemented.
 
-## 2. Camera acquisition — planned
+## 2. CameraX live preview — implemented and verified on a physical device
 
-- Select and add a compatible CameraX version.
-- Implement permission handling, lifecycle-bound preview, and analysis.
-- Define frame format, rotation, resolution, and analyzer backpressure policy.
-- Verify on supported physical devices and handle permission denial.
+- Added stable CameraX preview, camera2, and lifecycle artifacts at version 1.4.2.
+- Added an on-demand CAMERA permission flow with retry and app-settings handling after permanent denial.
+- Bound the rear-camera Preview use case to the activity lifecycle and release it when leaving Detection.
+- Hosted PreviewView in the Compose Detection screen with portrait-friendly fill-center scaling and an initialization state.
+- `ImageAnalysis`, frame processing, and YOLO26n inference remain out of scope for this phase.
+- A connected Android 15 physical phone passed an instrumentation test that observed the preview stream, navigated away, and re-entered Detection successfully.
+- Permission denial/retry/settings recovery and camera-unavailable behavior still need manual verification on target devices.
 
 ## 3. On-device inference — planned
 
 - Confirm the exported fine-tuned YOLO26n model format and runtime requirements.
-- Implement preprocessing, inference, and postprocessing against that model.
+- Add an ImageAnalysis use case beside Preview in the lifecycle-bound camera controller, then implement preprocessing, inference, and postprocessing against that model.
 - Test result correctness and latency on representative devices.
 - Do not display confidence or throughput until measured from real inference.
 

@@ -63,8 +63,8 @@ fun HomeScreen(
                     )
                     SummaryCard(
                         title = "Detection",
-                        value = "Not active",
-                        detail = "Camera and model are planned",
+                        value = "Preview ready",
+                        detail = "Model inference is not integrated",
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -76,7 +76,7 @@ fun HomeScreen(
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         StatusLine(title = "Application", status = "Research prototype")
-                        StatusLine(title = "Camera / model", status = "Not integrated")
+                        StatusLine(title = "Camera / model", status = "Preview only")
                         StatusLine(title = "Report storage", status = "Not configured")
                     }
                 }
@@ -116,7 +116,7 @@ private fun DetectionIntroCard(
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "Camera preview and YOLO26n inference are not yet connected. The screens are ready for future integration.",
+                text = "The rear-camera preview is ready. CameraX image analysis and YOLO26n inference are not connected.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

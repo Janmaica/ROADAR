@@ -2,13 +2,13 @@
 
 **Development and Evaluation of an Offline-Capable Android Application for Pothole Detection Using a Fine-Tuned YOLO26n Model**
 
-> **Development status: UI prototype.** The current application is a navigable interface and build foundation. Pothole detection, camera capture, GPS, local report storage, maps, and synchronization are not implemented.
+> **Development status: camera-preview prototype.** The app includes a lifecycle-bound CameraX rear-camera preview. Pothole detection/inference, GPS, local report storage, maps, and synchronization are not implemented.
 
 ## Overview
 
 ROADAR is a Computer Engineering research project exploring an Android application for identifying potholes and supporting road-condition reporting. Its research goal is to evaluate a fine-tuned YOLO26n model running on-device, with future report capture designed to work when network access is unavailable.
 
-This repository currently contains the Android project foundation and an initial Jetpack Compose interface. It does not yet include a trained model or operational detection/reporting functionality.
+This repository currently contains the Android project foundation, a Jetpack Compose interface, and a live rear-camera preview. It does not yet include a trained model or operational pothole detection/reporting functionality.
 
 ## Research motivation and objectives
 
@@ -30,7 +30,8 @@ These are project objectives, not claims about the current app.
 | Android build and Compose/Material 3 foundation | Implemented |
 | Home, detection, reports, map, and settings screens | Implemented as UI |
 | In-app navigation and device connectivity indicator | Implemented |
-| CameraX preview and live detection | Planned; not implemented |
+| CameraX rear-camera live preview and runtime permission flow | Implemented; preview verified on a physical Android 15 phone |
+| CameraX ImageAnalysis and pothole detection | Planned; not implemented |
 | Fine-tuned YOLO26n model and inference | Planned; model is not included |
 | GPS association and local report storage | Planned; not implemented |
 | Map visualization and background synchronization | Planned; not implemented |
@@ -42,15 +43,16 @@ The connectivity indicator reflects whether Android currently reports a validate
 
 - Kotlin and Android Gradle Plugin
 - Jetpack Compose and Material 3
+- CameraX 1.4.2 (rear-camera Preview use case only)
 - Android SDK 36 (`compileSdk`); minimum Android API 26; target API 35
 - Gradle Wrapper 8.11.1
 - Java 17
 
-CameraX, a model runtime, Room, WorkManager, and a maps SDK are intentionally not dependencies yet. They should be selected when their respective features are designed and implemented.
+CameraX preview, camera2, and lifecycle dependencies are included. A model runtime, Room, WorkManager, and a maps SDK are intentionally not dependencies yet; select them when their respective features are designed and implemented.
 
 ## Architecture
 
-The current app is a single-activity Compose application. `MainActivity` applies the app theme and hosts the app UI; screen selection is local Compose state with system-back handling and a bottom navigation bar. Reusable UI pieces and screen composables live in separate packages.
+The current app is a single-activity Compose application. `MainActivity` applies the app theme and hosts the app UI; screen selection is local Compose state with system-back handling and a bottom navigation bar. Reusable UI pieces and screen composables live in separate packages. The detection screen hosts a lifecycle-bound CameraX Preview use case through an isolated preview controller; no image analysis or inference runs.
 
 Future work should introduce feature boundaries and data/domain layers only as real integrations are added. See [docs/architecture.md](docs/architecture.md) for the current design and a proposed evolution path.
 
@@ -64,7 +66,8 @@ Future work should introduce feature boundaries and data/domain layers only as r
 │   │   ├── main/
 │   │   │   ├── java/com/roadar/app/
 │   │   │   │   ├── ui/components/
-│   │   │   │   ├── ui/navigation/
+│   │   │   │   ├── ui/camera/
+│   │   │   ├── ui/navigation/
 │   │   │   │   ├── ui/screens/
 │   │   │   │   └── ui/theme/
 │   │   │   └── res/
@@ -123,13 +126,13 @@ adb shell monkey -p com.roadar.app -c android.intent.category.LAUNCHER 1
 
 Run local unit tests with `.\gradlew.bat :app:testDebugUnitTest`. The navigation UI test requires a connected emulator or device and can be run with `.\gradlew.bat :app:connectedDebugAndroidTest`.
 
-**Verified 2026-11-11:** the debug build and APK succeeded; local unit tests passed; both instrumentation tests passed on a connected Android 15 (API 35) phone. The APK was installed and launched, and no Android runtime startup errors appeared in the inspected log. The UI test exercises dashboard actions and screen navigation; it does not validate camera, model, GPS, storage, offline reporting, synchronization, or performance behavior. See [docs/testing.md](docs/testing.md).
+**Verified 2026-11-11:** the debug build and APK succeeded; local unit tests passed; navigation tests and the CameraX streaming/re-entry instrumentation test passed on a connected Android 15 (API 35) phone. The installed app showed a live rear-camera preview in portrait orientation and launched without Android runtime startup errors in the inspected log. Permission-denial/settings recovery and camera-unavailable cases still require manual testing. YOLO26n, GPS, storage, offline reporting, synchronization, and inference performance remain unimplemented. See [docs/testing.md](docs/testing.md).
 
 ## Development roadmap
 
 1. Complete the app shell and interface foundation.
-2. Add CameraX acquisition and lifecycle-safe preview.
-3. Integrate the fine-tuned YOLO26n model and establish a reproducible inference pipeline.
+2. Verify CameraX preview, permission flows, and camera failure states on target devices.
+3. Add ImageAnalysis and integrate the fine-tuned YOLO26n model with a reproducible inference pipeline.
 4. Associate eligible detections with timestamps and GPS data; persist reports locally with Room.
 5. Add report history and map visualization without blocking offline use.
 6. Add constrained background synchronization with WorkManager.
@@ -139,7 +142,7 @@ The roadmap is a plan, not a feature guarantee. See [docs/roadmap.md](docs/roadm
 
 ## Research disclaimer
 
-ROADAR is an active research prototype. It is not a validated road-safety, navigation, or infrastructure-maintenance system. The current UI does not detect potholes or collect reports; do not rely on it for operational decisions.
+ROADAR is an active research prototype. It is not a validated road-safety, navigation, or infrastructure-maintenance system. The current app previews the camera but does not detect potholes or collect reports; do not rely on it for operational decisions.
 
 ## Project board
 
