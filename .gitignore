@@ -36,3 +36,12 @@ secrets.properties
 .env
 .env.*
 !.env.example
+
+# Local machine-learning checkpoints, exports, and datasets
+**/*.pt
+**/*.onnx
+**/*.tflite
+**/*.param
+**/best_ncnn_model/
+/datasets/
+app/src/androidTest/assets/roadar-stage4-pothole.jpg

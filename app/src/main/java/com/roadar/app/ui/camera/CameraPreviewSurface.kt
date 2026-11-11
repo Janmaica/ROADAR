@@ -7,12 +7,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.camera.core.ImageAnalysis
 import androidx.lifecycle.LifecycleOwner
+import java.util.concurrent.Executor
 
 @Composable
 fun CameraPreviewSurface(
     lifecycleOwner: LifecycleOwner,
     controller: CameraPreviewController,
+    analyzer: ImageAnalysis.Analyzer,
+    analyzerExecutor: Executor,
     modifier: Modifier = Modifier,
     onStreamingChanged: (Boolean) -> Unit,
     onError: (String) -> Unit
@@ -34,6 +38,8 @@ fun CameraPreviewSurface(
         controller.bind(
             lifecycleOwner = lifecycleOwner,
             previewView = previewView,
+            analyzer = analyzer,
+            analyzerExecutor = analyzerExecutor,
             onStreamingChanged = onStreamingChanged,
             onError = onError
         )

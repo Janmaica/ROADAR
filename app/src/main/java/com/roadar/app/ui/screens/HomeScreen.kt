@@ -14,9 +14,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.roadar.app.ai.YOLO26_MODEL_ASSET
 import com.roadar.app.ui.components.EmptyStateCard
 import com.roadar.app.ui.components.PageHeader
 import com.roadar.app.ui.components.RoadarCard
@@ -28,6 +31,11 @@ fun HomeScreen(
     onStartDetection: () -> Unit,
     onViewReports: () -> Unit
 ) {
+    val context = LocalContext.current
+    val hasModelAsset = remember(context) {
+        context.assets.list("")?.contains(YOLO26_MODEL_ASSET) == true
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 22.dp),
@@ -42,6 +50,7 @@ fun HomeScreen(
         }
         item {
             DetectionIntroCard(
+                hasModelAsset = hasModelAsset,
                 onStartDetection = onStartDetection,
                 onViewReports = onViewReports
             )
@@ -63,8 +72,12 @@ fun HomeScreen(
                     )
                     SummaryCard(
                         title = "Detection",
-                        value = "Preview ready",
-                        detail = "Model inference is not integrated",
+                        value = if (hasModelAsset) "Model available" else "Model required",
+                        detail = if (hasModelAsset) {
+                            "Offline inference is enabled"
+                        } else {
+                            "Add the local ONNX model asset"
+                        },
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -76,7 +89,10 @@ fun HomeScreen(
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         StatusLine(title = "Application", status = "Research prototype")
-                        StatusLine(title = "Camera / model", status = "Preview only")
+                        StatusLine(
+                            title = "Camera / model",
+                            status = if (hasModelAsset) "Inference available" else "Model asset missing"
+                        )
                         StatusLine(title = "Report storage", status = "Not configured")
                     }
                 }
@@ -93,6 +109,7 @@ fun HomeScreen(
 
 @Composable
 private fun DetectionIntroCard(
+    hasModelAsset: Boolean,
     onStartDetection: () -> Unit,
     onViewReports: () -> Unit
 ) {
@@ -116,7 +133,11 @@ private fun DetectionIntroCard(
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "The rear-camera preview is ready. CameraX image analysis and YOLO26n inference are not connected.",
+                text = if (hasModelAsset) {
+                    "CameraX and the local YOLO26n model are ready for offline inference. Detections are not saved as reports."
+                } else {
+                    "The rear-camera preview is ready. Add the excluded ONNX model asset to enable local inference."
+                },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

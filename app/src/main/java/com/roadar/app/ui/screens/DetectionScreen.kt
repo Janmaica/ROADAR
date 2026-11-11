@@ -37,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
@@ -44,12 +45,19 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.activity.ComponentActivity
+import com.roadar.app.ai.DetectionFrame
+import com.roadar.app.ai.DetectionSession
+import com.roadar.app.ai.DetectionUiState
+import com.roadar.app.ai.DetectorStatus
 import com.roadar.app.ui.camera.CameraPreviewController
 import com.roadar.app.ui.camera.CameraPreviewSurface
+import com.roadar.app.ui.camera.DetectionOverlay
 import com.roadar.app.ui.components.PageHeader
 import com.roadar.app.ui.components.RoadarCard
 import com.roadar.app.ui.components.SectionHeading
 import com.roadar.app.ui.components.StatusLine
+import java.util.Locale
+import kotlin.math.roundToInt
 
 private const val CAMERA_PERMISSION_PREFERENCES = "roadar_camera_permission"
 private const val CAMERA_PERMISSION_REQUESTED = "requested"
@@ -74,7 +82,11 @@ fun DetectionScreen() {
     }
     var isPreviewStreaming by remember { mutableStateOf(false) }
     var cameraError by remember { mutableStateOf<String?>(null) }
+    var detectionState by remember { mutableStateOf(DetectionUiState()) }
     val cameraController = remember(context) { CameraPreviewController(context) }
+    val detectionSession = remember(context) {
+        DetectionSession(context) { state -> detectionState = state }
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -93,6 +105,7 @@ fun DetectionScreen() {
     }
 
     DisposableEffect(activity, context) {
+        detectionSession.start()
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 permissionState = resolveCameraPermissionState(context, activity, preferences)
@@ -102,6 +115,7 @@ fun DetectionScreen() {
         onDispose {
             activity?.lifecycle?.removeObserver(observer)
             cameraController.unbind()
+            detectionSession.close()
         }
     }
 
@@ -115,7 +129,7 @@ fun DetectionScreen() {
         PageHeader(
             eyebrow = "Detection workspace",
             title = "Live camera preview",
-            description = "Rear-camera preview is ready for future model integration. No inference is running."
+            description = "Pothole inference runs locally on camera frames. Reports and locations are not saved."
         )
 
         SectionHeading(
@@ -135,7 +149,10 @@ fun DetectionScreen() {
                 CameraPreviewCard(
                     lifecycleOwner = activity,
                     controller = cameraController,
+                    analyzer = detectionSession,
+                    analyzerExecutor = detectionSession.analyzerExecutor,
                     isStreaming = isPreviewStreaming,
+                    detectionFrame = detectionState.latestFrame,
                     onStreamingChanged = {
                         isPreviewStreaming = it
                         if (it) cameraError = null
@@ -206,6 +223,14 @@ fun DetectionScreen() {
             }
         }
 
+        if (detectionState.status == DetectorStatus.ERROR) {
+            CameraMessageCard(
+                title = "Pothole model unavailable",
+                message = detectionState.errorMessage
+                    ?: "The local pothole model could not be initialized."
+            )
+        }
+
         RoadarCard {
             Column(
                 modifier = Modifier
@@ -223,19 +248,60 @@ fun DetectionScreen() {
                         else -> "Opening preview"
                     }
                 )
-                StatusLine(title = "Model", status = "YOLO26n not integrated")
+                StatusLine(
+                    title = "YOLO26n model",
+                    status = when (detectionState.status) {
+                        DetectorStatus.LOADING -> "Loading local model"
+                        DetectorStatus.READY -> "Ready"
+                        DetectorStatus.ERROR -> "Unavailable"
+                    }
+                )
+                detectionState.executionProvider?.let { executionProvider ->
+                    StatusLine(title = "Runtime", status = executionProvider)
+                }
             }
         }
 
         SectionHeading(
             title = "Performance",
-            supportingText = "No inference metrics are available before model integration"
+            supportingText = "Live device measurements; frame rate counts completed inferences"
         )
+        val latestFrame = detectionState.latestFrame
+        val highestConfidence = latestFrame?.detections?.maxOfOrNull { it.confidence }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            MetricCard(title = "Confidence", value = "—", modifier = Modifier.weight(1f))
-            MetricCard(title = "Inference", value = "— ms", modifier = Modifier.weight(1f))
-            MetricCard(title = "FPS", value = "—", modifier = Modifier.weight(1f))
+            MetricCard(
+                title = "Confidence",
+                value = highestConfidence?.let { "${(it * 100).roundToInt()}%" }
+                    ?: if (latestFrame == null) "—" else "None",
+                modifier = Modifier.weight(1f)
+            )
+            MetricCard(
+                title = "Inference",
+                value = latestFrame?.let { formatTime(it.inferenceTimeMs) } ?: "—",
+                valueTestTag = "detection_metric_inference",
+                modifier = Modifier.weight(1f)
+            )
         }
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            MetricCard(
+                title = "Latency",
+                value = latestFrame?.let { formatTime(it.processingLatencyMs) } ?: "—",
+                modifier = Modifier.weight(1f)
+            )
+            MetricCard(
+                title = "Processed FPS",
+                value = detectionState.processedFps?.let { String.format(Locale.US, "%.1f", it) }
+                    ?: "—",
+                modifier = Modifier.weight(1f)
+            )
+        }
+        Text(
+            text = detectionState.modelLoadTimeMs?.let {
+                "Model load: ${formatTime(it)}"
+            } ?: "Model load: —",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
@@ -243,7 +309,10 @@ fun DetectionScreen() {
 private fun CameraPreviewCard(
     lifecycleOwner: androidx.lifecycle.LifecycleOwner,
     controller: CameraPreviewController,
+    analyzer: androidx.camera.core.ImageAnalysis.Analyzer,
+    analyzerExecutor: java.util.concurrent.Executor,
     isStreaming: Boolean,
+    detectionFrame: DetectionFrame?,
     onStreamingChanged: (Boolean) -> Unit,
     onError: (String) -> Unit
 ) {
@@ -258,10 +327,13 @@ private fun CameraPreviewCard(
             CameraPreviewSurface(
                 lifecycleOwner = lifecycleOwner,
                 controller = controller,
+                analyzer = analyzer,
+                analyzerExecutor = analyzerExecutor,
                 modifier = Modifier.fillMaxSize(),
                 onStreamingChanged = onStreamingChanged,
                 onError = onError
             )
+            DetectionOverlay(frame = detectionFrame)
             if (!isStreaming) {
                 Box(
                     modifier = Modifier
@@ -339,12 +411,13 @@ private fun CameraMessageCard(
 private fun MetricCard(
     title: String,
     value: String,
+    valueTestTag: String? = null,
     modifier: Modifier = Modifier
 ) {
     RoadarCard(modifier = modifier) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
                 .padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -355,13 +428,18 @@ private fun MetricCard(
             )
             Text(
                 text = value,
+                modifier = if (valueTestTag == null) Modifier else Modifier.testTag(valueTestTag),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Bold
             )
         }
     }
+
 }
+
+private fun formatTime(milliseconds: Float): String =
+    String.format(Locale.US, "%.1f ms", milliseconds)
 
 private fun resolveCameraPermissionState(
     context: Context,
