@@ -1,5 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.ROADAR" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.ROADAR" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:colorAccent">@color/roadar_royal_blue</item>
+        <item name="android:windowBackground">@color/roadar_ice_blue</item>
+        <item name="android:statusBarColor">@color/roadar_ice_blue</item>
+        <item name="android:navigationBarColor">@color/roadar_ice_blue</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
 </resources>

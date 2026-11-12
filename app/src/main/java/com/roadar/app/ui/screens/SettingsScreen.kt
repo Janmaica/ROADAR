@@ -66,17 +66,16 @@ fun SettingsScreen() {
             InformationSection(
                 title = "Mapping and synchronization",
                 rows = listOf(
-                    "Interactive map" to "Deferred · source not selected",
-                    "Offline map tiles" to "Not configured or tested",
-                    "Automatic reporting" to "Disabled pending reliable tracking",
-                    "Background sync" to "Not configured",
+                    "Interactive map" to "MapLibre · MapTiler Streets online",
+                    "Offline map tiles" to "Unavailable · basemap requires internet",
+                    "Report synchronization" to "Blocked · no authorized backend configured",
                     "Network status" to "Device connectivity only"
                 )
             )
         }
         item {
             Text(
-                text = "Manual local reporting is implemented in the prototype, but full on-device detection, permission, GPS, and report workflow validation remains outstanding. The map and synchronization are not available.",
+                text = "Reports are stored locally in Room and remain available offline. Saving requires a real detection and a fresh valid device location. Map tiles require internet. Synchronization is not implemented because no authorized server or upload API has been provided.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

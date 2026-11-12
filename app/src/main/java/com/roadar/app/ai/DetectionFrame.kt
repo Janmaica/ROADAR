@@ -30,15 +30,5 @@ data class DetectionUiState(
     val errorMessage: String? = null,
     val latestFrame: DetectionFrame? = null,
     val processedFps: Float? = null,
-    val tracking: DetectionTrackingUiState = DetectionTrackingUiState()
-)
-
-data class DetectionTrackingUiState(
-    val isEnabled: Boolean = false,
-    val activeTrackCount: Int = 0,
-    val confirmedTrackCount: Int = 0,
-    val qualifyingDetectionCount: Int = 0,
-    val latestConfidence: Float? = null,
-    val confirmationProgress: Int = 0,
-    val confirmationsThisFrame: Int = 0
+    val performance: InferencePerformanceSummary? = null
 )

@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -34,6 +35,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.roadar.app.data.report.PotholeReportRepository
 import com.roadar.app.data.report.RoadarDatabase
@@ -135,6 +138,9 @@ fun RoadarApp() {
                                 onViewReports = {
                                     currentDestinationState.value = RoadarDestination.REPORTS
                                 },
+                                onOpenMap = {
+                                    currentDestinationState.value = RoadarDestination.MAP
+                                },
                                 reportRepository = reportRepository
                             )
 
@@ -169,7 +175,11 @@ private fun RoadarNavigationBar(
     currentDestination: RoadarDestination,
     onDestinationSelected: (RoadarDestination) -> Unit
 ) {
-    NavigationBar {
+    NavigationBar(
+        containerColor = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        tonalElevation = 3.dp
+    ) {
         RoadarDestination.entries.forEach { destination ->
             NavigationBarItem(
                 modifier = Modifier.testTag("navigation_${destination.name.lowercase()}"),
@@ -178,10 +188,25 @@ private fun RoadarNavigationBar(
                 icon = {
                     NavigationGlyph(
                         destination = destination,
-                        selected = currentDestination == destination
+                        selected = currentDestination == destination,
+                        modifier = Modifier.semantics {
+                            contentDescription = destination.label
+                        }
                     )
                 },
-                label = { Text(destination.label) }
+                label = {
+                    Text(
+                        destination.label,
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                },
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = MaterialTheme.colorScheme.primary,
+                    selectedTextColor = MaterialTheme.colorScheme.primary,
+                    indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             )
         }
     }
@@ -190,14 +215,15 @@ private fun RoadarNavigationBar(
 @Composable
 private fun NavigationGlyph(
     destination: RoadarDestination,
-    selected: Boolean
+    selected: Boolean,
+    modifier: Modifier = Modifier
 ) {
     val color = if (selected) {
         MaterialTheme.colorScheme.primary
     } else {
         MaterialTheme.colorScheme.onSurfaceVariant
     }
-    Canvas(modifier = Modifier.size(24.dp)) {
+    Canvas(modifier = modifier.size(24.dp)) {
         val canvasHeight = size.height
         val canvasWidth = size.width
         val scaleX = canvasWidth / 24f

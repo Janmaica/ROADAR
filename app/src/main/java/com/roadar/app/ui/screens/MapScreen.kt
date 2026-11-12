@@ -18,7 +18,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -36,6 +38,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
@@ -208,8 +211,7 @@ fun MapScreen(
                     .position(LatLng(report.latitude, report.longitude))
                     .title("ROADAR report")
                     .snippet(
-                        "${report.reportingMode.name} · " +
-                            String.format(Locale.US, "%.1f%%", report.detectionConfidence * 100f) +
+                        String.format(Locale.US, "%.1f%%", report.detectionConfidence * 100f) +
                             " · Device position"
                     )
             )
@@ -244,7 +246,7 @@ fun MapScreen(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            OutlinedButton(
+            Button(
                 onClick = {
                     if (hasLocationPermission()) locateUser()
                     else locationPermissionLauncher.launch(
@@ -278,6 +280,7 @@ fun MapScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(300.dp)
+                    .clip(RoundedCornerShape(18.dp))
                     .testTag("roadar_interactive_map")
             ) {
                 val mapView = remember(context, apiKey) {
@@ -461,8 +464,7 @@ fun MapScreen(
                             .testTag("map_report_${report.id}")
                     ) {
                         Text(
-                            text = "${report.reportingMode.name} · " +
-                                String.format(Locale.US, "%.6f, %.6f", report.latitude, report.longitude) +
+                            text = String.format(Locale.US, "%.6f, %.6f", report.latitude, report.longitude) +
                                 " · ±${report.horizontalAccuracyMeters.toInt()} m"
                         )
                     }
@@ -476,7 +478,7 @@ fun MapScreen(
         } else {
             EmptyStateCard(
                 title = "No local reports yet",
-                description = "Saved reports from either reporting mode will appear here as map markers when the online basemap is available.",
+                description = "Manually saved reports will appear here as map markers when the online basemap is available.",
                 marker = "R"
             )
         }
@@ -500,7 +502,7 @@ private fun SelectedReportCard(report: PotholeReport) {
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Text(
-                "Selected report · ${report.reportingMode.name}",
+                "Selected report",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold
             )

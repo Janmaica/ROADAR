@@ -1,0 +1,10 @@
+<resources>
+    <style name="Theme.ROADAR" parent="android:Theme.Material.NoActionBar">
+        <item name="android:colorAccent">@color/roadar_sky_blue</item>
+        <item name="android:windowBackground">#FF081326</item>
+        <item name="android:statusBarColor">#FF081326</item>
+        <item name="android:navigationBarColor">#FF081326</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+</resources>

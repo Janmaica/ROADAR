@@ -21,8 +21,8 @@ Run `.\tools\verify-model.ps1` after placing the authorized model asset locally.
 - `PotholeReportDaoTest` uses a temporary file-backed Room database to cover insert, ordered query/observation, enum/timestamp round trips, synchronization-status update, deletion, and persistence after database close/reopen.
 - `ReportsScreenTest` injects an isolated in-memory test repository to verify a stored report's details, confirmed deletion, and report-ID map navigation. Its synthetic test record is not added to the app database.
 - `MapScreenTest` verifies selection and observed removal of a local test row without a basemap key. It does not exercise rendered MapLibre markers or remote tiles.
-- `PotholeDetectionTrackerTest` covers >=0.60 confidence filtering, malformed boxes, three consecutive-frame confirmation, reordered multiple-object association, track expiry/reacquisition, and once-per-track report marking. Fixtures are synthetic and run only in JVM tests.
-- `RoadarNavigationTest` visits the app destinations, verifies either the configured map container or the missing-key fallback, and exercises automatic-mode UI pause/resume.
+- `InferenceMetricsAccumulatorTest` verifies latency mean/min/max/median/p95, bounded rolling samples, session frame/detection counts, invalid measurement rejection, and processing-only rate estimation using synthetic durations. The displayed estimate excludes callback gaps and is not camera FPS.
+- `RoadarNavigationTest` visits the app destinations, verifies either the configured map container or the missing-key fallback, and verifies that Detection exposes only manual reporting.
 - `CameraPreviewTest` grants camera permission, waits for streaming, navigates away and back, and waits for the preview to resume.
 - `PotholeInferenceInstrumentedTest` exercises actual model inference on the ignored held-out Stage 4 image when assets are present.
 
@@ -30,28 +30,28 @@ Run `.\tools\verify-model.ps1` after placing the authorized model asset locally.
 
 On the connected Vivo V2430 running Android 15 (API 35):
 
-- MapLibre 11.8.0 and the Compose map integration compiled, and `:app:assembleDebug` passed.
-- The full connected suite passed (12 tests, 0 failures) on the connected Vivo V2430 running Android 15 (API 35), after making the navigation assertion respect whether the local key is configured. Coverage included Room persistence, local report selection/removal and report-to-map callback, report UI, automatic mode UI, real held-out model inference, camera streaming/re-entry, and navigation.
-- `:app:testDebugUnitTest` passed, including the new tracker unit tests; `:app:compileDebugAndroidTestKotlin` passed.
-- A key in ignored local configuration enabled the MapTiler Streets v4 basemap to render on the phone; a single-finger pan was visibly confirmed. This verifies style/tile rendering and panning, but not pinch zoom. Separately, the developer reports physically verifying that saved report markers appear and that deleting a report removes its marker. That manual verification was not repeated in this automated run; the production database contained zero reports, so live marker selection/deletion was not independently retested here. Existing instrumentation checks report-list observation/selection/removal using isolated test data, not a live rendered marker.
-- The app was reinstalled with `adb install -r` (without clearing app data), launched successfully, and remained on its resumed activity through repeated navigation to and from Map. Fine and coarse location were not granted, so current-location centering was not exercised. End-to-end manual reporting with live detection, a fresh location fix, and a production Room insert remains unverified.
-- `:app:assembleDebug` and `:app:testDebugUnitTest` passed using Android Studio's JDK 21. The literal requested Gradle target `:app` is not a task in this project; use the explicit task paths above.
+- `:app:testDebugUnitTest`, `:app:connectedDebugAndroidTest`, and `:app:assembleDebug` passed using Android Studio's bundled JDK 21. Results: 12 JVM tests passed; all 12 connected tests passed with 0 failures and 0 skips.
+- Connected coverage included actual held-out model inference, Room persistence, isolated report and map-list selection/deletion, camera streaming/re-entry, navigation, and the manual-only Detection screen. The reports/markers used isolated test data; the connected suite did not create or delete production records.
+- The final APK was installed using `adb install -r` without clearing app data and launched on the Vivo. `MainActivity` was resumed, and no app fatal exception appeared in the inspected recent logcat buffer.
+- In an earlier device session, MapTiler Streets v4 rendered and a pan gesture was visibly verified. The developer reports previously verifying manual report creation, marker display, and marker deletion; these interactions were not repeated in this run. Pinch zoom and current-location centering remain unverified.
+- The local model checksum script passed. `local.properties` and the ONNX asset remain ignored and untracked; the key was not found in tracked files, and no files were staged.
+- No Room schema change was made. Existing schema-v1 records remain compatible, including the retained legacy reporting-mode enum value.
+- No controlled inference benchmark or airplane-mode test was performed. The metrics shown are exploratory session measurements, not controlled benchmark results; see the repeatable procedure below.
 - Source-only verification was also run with the ignored ONNX asset temporarily absent and restored afterward: `:app:assembleDebug`, `:app:testDebugUnitTest`, and `:app:connectedDebugAndroidTest` passed; the inference-specific instrumentation test skipped as expected, and the camera test verified the explicit missing-model message. The generated APK was confirmed not to contain `assets/roadar_yolo26n.onnx`.
-- No Room schema change was needed; existing user reports and schema v1 are preserved.
 - The database schema was generated and exported as `app/schemas/com.roadar.app.data.report.RoadarDatabase/1.json`.
 - Debug APK was produced at `app/build/outputs/apk/debug/app-debug.apk`.
 
-These automated checks do **not** verify the complete manual reporting flow with a live camera detection, user-granted location permission, a real fresh location fix, successful insertion into the app's production database, and subsequent display in Reports. Location permission denial/approximate-vs-precise behavior and actual location-provider failures also remain to be tested manually. Room's device tests use an isolated file-backed test DB; a dedicated airplane-mode app test has not been run.
+This verification did **not** repeat the complete production manual-report flow with a fresh location fix, permission denial/approximate-vs-precise cases, GPS disabled, airplane mode, or marker interaction against existing production records. The developer reports that manual report creation, map markers, and marker deletion were physically verified in an earlier session; the current automated tests use isolated records. Room's file-backed instrumentation test verifies persistence across database close/reopen.
 
 ## Manual reporting verification still required
 
 On a test device with the ignored local model asset installed:
 
 1. Open Detection and verify actual Stage 4 detections appear; do not infer a report from empty or placeholder UI.
-2. Select **Review** for a visible detection and confirm the confidence displayed.
+2. Tap **Save Report** for a visible detection and confirm the confidence and device-position explanation in the dialog.
 3. Confirm the report. Grant only foreground approximate or precise location when prompted.
 4. Verify the app rejects unavailable, stale, invalid, or insufficient-accuracy fixes with a retry path and never substitutes `0,0`.
-5. On successful insertion, verify the success message appears only after save and that the report appears in Reports with confidence, event/creation/fix times, device coordinates, accuracy, mode, model, and sync status.
+5. On successful insertion, verify the success message appears only after save and that the report appears in Reports with confidence, event/creation/fix times, device coordinates, accuracy, model, and sync status.
 6. Navigate away and reopen Reports; verify the record remains. Repeat with airplane mode enabled to test local database access without network.
 7. Test permission denial, app-settings recovery, and a deliberately unavailable location service. No background location should be requested or collected.
 
@@ -68,14 +68,31 @@ The stored point is the phone's position associated with the detection event, no
 5. Tap **Center on device**, test denial and approximate/precise permission outcomes, and confirm the map uses a recent fix only after the user action.
 6. Disable network while viewing the map. Verify the basemap is marked unavailable when tile requests fail and local report details remain accessible. This tests offline data access, not an offline basemap.
 
-### Experimental automatic tracking
+### Manual reporting and offline validation
 
-1. Enter Detection with the real local Stage 4 model available. Start in `MANUAL`; verify manual review/confirmation still behaves as before.
-2. Choose `AUTOMATIC · EXPERIMENTAL`. Confirm the UI explains that persistence is disabled and GPS is not requested. Let actual camera detections flow and inspect confidence, active/confirmed tracks, and confirmation progress.
-3. Confirm test mode does not write automatic rows or request location. Pause tracking, switch back to Manual, then leave Detection; the tracker should stop/reset with the session.
-4. Track fixtures and session-level once-per-track marking are unit tests only. They do not establish physical identity after camera motion, occlusion, or reacquisition. Do not treat the synthetic IoU tests as field validation.
+1. Install the current build without clearing app data and open Detection with the verified local Stage 4 model.
+2. Confirm bounding boxes, confidence, and inference metrics appear for actual detections. Tap **Save Report**, inspect the confidence and device-position explanation, then confirm.
+3. Test both granted approximate/precise location and denied permission. Confirm denial, disabled location services, unavailable/stale fixes, and poor accuracy produce explicit feedback and never create a report.
+4. With a valid fix, verify the success message appears only after save; check the report’s coordinates, accuracy, confidence, and event/creation/fix timestamps in Reports. Open its map details/marker, then delete it and verify observed removal. Use only real detections and existing data, not fabricated production records.
+5. Restart the app without clearing data and verify the report remains. Repeat report-list/detail checks with network disabled; separately confirm the online basemap becomes unavailable while local report details remain accessible. A GPS fix may not be available offline on every device.
+6. Confirm CameraX preview and inference recover after leaving/re-entering Detection and after background/resume. Do not claim airplane-mode behavior unless this test is actually run.
 
-Automatic persistence is disabled. YOLO26n supplies per-frame boxes without stable IDs; image-space IoU can split or switch tracks as camera/vehicle motion changes perspective. GPS device position plus its accuracy cannot reliably distinguish nearby potholes. A cooldown or one-time mark per temporary track is insufficient to avoid duplicates after track reacquisition; therefore no automatic Room rows are generated and no location request is made per frame.
+Automatic reporting and the experimental tracker are removed. New records are manual only. The Room schema retains its legacy automatic reporting-mode enum value solely to preserve compatibility with any previously stored schema-v1 rows; the app performs no automatic location requests or inserts.
+
+### Reproducible physical-device inference benchmark
+
+Target device: Vivo V2430, Android 15 (API 35). Use the same APK, local model file/checksum, camera, scene, lighting, and device power/thermal conditions for each trial. Keep the phone stationary and do not operate ROADAR while driving.
+
+1. Verify the local ONNX asset with `.\tools\verify-model.ps1`; record the APK build/commit, model SHA-256, device/OS, and CPU execution provider.
+2. Start Detection and let the model warm up for 60 seconds. Keep the same static test scene and camera framing throughout.
+3. Run three 60-second measurement trials, returning to a fresh Detection session between trials. At each trial end, record model-load time, observed processed FPS, rolling inference mean/min/max/median/p95, average pipeline latency, processing-only rate estimate, processed frames, and detection count from the UI.
+4. Preserve each trial separately; report per-trial values and the median across trials. Note interruptions, thermal throttling, permission changes, or model errors. Do not invent missing values.
+
+The UI's observed processed FPS is completed inference throughput over elapsed sampling windows, not camera capture FPS. The processing-only rate estimate divides frames by their measured processing duration and excludes callback gaps; it is not end-to-end throughput. No controlled benchmark result is currently recorded.
+
+## Synchronization status
+
+The research objectives mention exploring synchronization when connectivity returns. No authorized server, endpoint, credentials, or idempotent upload contract is configured in ROADAR, so synchronization is blocked and not implemented. Reports remain local and are not deleted or changed because connectivity changes. Supply the approved backend/API contract before implementing uploads, retries, or WorkManager.
 
 ### Map provider research and offline boundaries
 

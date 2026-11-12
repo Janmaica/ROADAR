@@ -1,10 +1,12 @@
-<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="purple_200">#FFBB86FC</color>
-    <color name="purple_500">#FF6200EE</color>
-    <color name="purple_700">#FF3700B3</color>
-    <color name="teal_200">#FF03DAC5</color>
-    <color name="teal_700">#FF018786</color>
-    <color name="black">#FF000000</color>
+    <color name="roadar_navy">#102A56</color>
+    <color name="roadar_deep_blue">#174EA6</color>
+    <color name="roadar_royal_blue">#2563EB</color>
+    <color name="roadar_sky_blue">#60A5FA</color>
+    <color name="roadar_light_blue">#BFDBFE</color>
+    <color name="roadar_ice_blue">#EFF6FF</color>
+    <color name="roadar_border">#DBEAFE</color>
+    <color name="roadar_text">#0F172A</color>
+    <color name="roadar_secondary_text">#64748B</color>
     <color name="white">#FFFFFFFF</color>
 </resources>

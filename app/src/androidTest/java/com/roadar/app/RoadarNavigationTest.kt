@@ -1,14 +1,14 @@
 package com.roadar.app
 
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsOn
-import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -20,6 +20,8 @@ class RoadarNavigationTest {
 
     @Test
     fun dashboardActionsAndNavigationOpenAllScreens() {
+        composeRule.onNodeWithText("ROADAR").assertIsDisplayed()
+        composeRule.onNodeWithText("Smart pothole detection").assertIsDisplayed()
         composeRule.onNodeWithText("Start detection").performClick()
         composeRule.onNodeWithText("Camera preview").assertIsDisplayed()
 
@@ -44,23 +46,23 @@ class RoadarNavigationTest {
     }
 
     @Test
-    fun automaticModeIsClearlyExperimentalAndCanBePaused() {
+    fun detectionOffersOnlyManualReporting() {
         composeRule.onNodeWithText("Start detection").performClick()
-        composeRule.onNodeWithTag("reporting_mode_automatic")
-            .performScrollTo()
-            .performClick()
-
-        composeRule.onNodeWithText("Automatic reporting · Experimental")
+        composeRule.onNodeWithText("Manual reporting")
             .performScrollTo()
             .assertIsDisplayed()
-        composeRule.onNodeWithText("Automatic persistence is paused", substring = true)
+        composeRule.onNodeWithText("GPS")
             .performScrollTo()
             .assertIsDisplayed()
-        composeRule.onNodeWithTag("automatic_tracking_switch").performScrollTo().assertIsOn()
-        composeRule.onNodeWithTag("automatic_tracking_switch").performClick()
-        composeRule.onNodeWithTag("automatic_tracking_switch").performScrollTo().assertIsOff()
-        composeRule.onNodeWithText("Automatically saved this session")
-            .performScrollTo()
-            .assertIsDisplayed()
+        assertTrue(
+            composeRule.onAllNodesWithText("Reporting mode")
+                .fetchSemanticsNodes()
+                .isEmpty()
+        )
+        assertTrue(
+            composeRule.onAllNodesWithText("AUTOMATIC · EXPERIMENTAL")
+                .fetchSemanticsNodes()
+                .isEmpty()
+        )
     }
 }

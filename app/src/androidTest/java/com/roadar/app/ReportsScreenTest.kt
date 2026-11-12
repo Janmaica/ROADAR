@@ -37,7 +37,7 @@ class ReportsScreenTest {
         }
 
         composeRule.onNodeWithText("Pothole reports").assertIsDisplayed()
-        composeRule.onNodeWithText("83.0% · MANUAL · PENDING").assertIsDisplayed()
+        composeRule.onNodeWithText("Detection confidence 83.0%").assertIsDisplayed()
         composeRule.onNodeWithTag("report_details_${TEST_REPORT_ID}").performClick()
         composeRule.onNodeWithText("Report details").assertIsDisplayed()
         composeRule.onNodeWithText(TEST_REPORT_ID).assertIsDisplayed()

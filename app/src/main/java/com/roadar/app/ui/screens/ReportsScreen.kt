@@ -11,10 +11,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -124,7 +126,6 @@ fun ReportsScreen(
                     DetailLine("Report ID", report.id)
                     DetailLine("Created", formatReportTime(report.createdAtUtcMillis))
                     DetailLine("Detection confidence", formatConfidence(report.detectionConfidence))
-                    DetailLine("Reporting mode", report.reportingMode.name)
                     DetailLine("Device position", formatCoordinates(report.latitude, report.longitude))
                     DetailLine(
                         "Horizontal accuracy",
@@ -200,22 +201,41 @@ private fun ReportCard(
                 .padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text(
-                text = formatReportTime(report.createdAtUtcMillis),
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+            ) {
+                Text(
+                    text = formatReportTime(report.createdAtUtcMillis),
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = MaterialTheme.colorScheme.secondaryContainer
+                ) {
+                    Text(
+                        text = report.synchronizationStatus.name,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
             Text(
                 text = "ID ${report.id}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
-                text = "${formatConfidence(report.detectionConfidence)} · ${report.reportingMode.name} · " +
-                    "${report.synchronizationStatus.name}",
+                text = "Detection confidence ${formatConfidence(report.detectionConfidence)}",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.secondary,
+                fontWeight = FontWeight.SemiBold
             )
             Text(
                 text = "Device position ${formatCoordinates(report.latitude, report.longitude)} " +

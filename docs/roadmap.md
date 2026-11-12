@@ -18,6 +18,7 @@ The milestones below distinguish implemented prototype code from features that a
 
 - Preserves the selected Stage 4 checkpoint and uses its fixed-shape FP32 ONNX export; model binaries remain excluded from Git.
 - ONNX Runtime CPU inference, frame preprocessing, output filtering/NMS, bounding boxes, and confidence labels.
+- Live UI instrumentation includes recent inference latency mean/min/max/median/p95, average processing latency, total processed frames/detections, and a processing-only rate estimate. This estimate excludes callback gaps and is not camera FPS or a controlled benchmark.
 - Connected tests include a held-out Stage 4 pothole image and live camera analysis.
 - Broader device/field evaluation and a final repeated performance benchmark remain outstanding. An isolated CPU result is not evidence of road-speed suitability; NNAPI failed to initialize with this graph on the tested phone.
 
@@ -30,14 +31,13 @@ The milestones below distinguish implemented prototype code from features that a
 - Local unit and connected tests cover fix validation, report construction, Room insert/query/observe/update/delete/persistence, and isolated report UI details/deletion.
 - Still requires manual on-device validation of permission outcomes, fresh/poor/unavailable fixes, actual save/readback with a live detection, airplane-mode persistence, and longer-term data migration policy.
 
-## 5. Automatic tracking — experimental; automatic persistence disabled
+## 5. Manual reporting — implemented; repeat full physical validation
 
-- The Detection screen offers a manual/automatic mode selector; manual remains the default and unchanged.
-- Automatic mode runs a separate greedy IoU tracker on real YOLO26n boxes (default confidence 0.60, IoU 0.30, three consecutive frames; one missed frame tolerated).
-- Unit tests cover temporal confirmation, confidence/box filtering, multiple objects, track expiry/reacquisition, and once-per-track report marking.
-- UI reports active/paused state, GPS behavior, confidence, track confirmation, and an automatic-save count of zero.
-- Automatic Room persistence and location acquisition remain off: camera motion and reacquisition can assign a new track ID to an already-seen pothole. The tracker is not field-validated and has no spatial duplicate guarantee.
-- Validate on representative moving-camera footage before enabling any automatic saves.
+- The Detection screen has a single **Save Report** workflow for recent actual model detections; users confirm before any location request or persistence.
+- Fused foreground location is validated for coordinate ranges, freshness, and accuracy. Permission denial, unavailable/disabled location, invalid fixes, and inaccurate fixes must leave the report unsaved with visible feedback.
+- New reports are inserted through the existing Room repository and contain detection confidence, model metadata, UTC timestamps, and the associated device location.
+- Room schema v1 and the legacy reporting-mode converter are preserved. No destructive migration is required; new reports are marked `MANUAL`.
+- Re-run device validation for precise/approximate permission, offline valid-fix availability, unavailable GPS, save/readback, restart persistence, and report deletion.
 
 ## 6. Interactive map — online implementation; provider rendering verification pending
 
@@ -47,8 +47,8 @@ The milestones below distinguish implemented prototype code from features that a
 - A locally configured key enabled live Streets v4 rendering on the connected phone; a pan gesture was verified. The developer reports physically verifying saved-report markers and marker removal after report deletion; this was not repeated during the latest automated test run. Pinch zoom, marker taps, and location centering remain to be checked in a documented device session.
 - Offline report storage is implemented; offline basemap tiles/downloads are not. No tile prefetch or offline region download is used.
 
-## 7. Synchronization and research evaluation — planned/in progress
+## 7. Synchronization and research evaluation — synchronization blocked
 
-- Define a backend/authentication contract before adding WorkManager and retries.
+- The research objective includes synchronization when connectivity returns, but no authorized backend, endpoint, authentication details, or idempotent upload contract is configured. Do not implement an invented destination; request the approved infrastructure before adding WorkManager/retries.
 - Broaden model, latency/FPS, geolocation accuracy, resource use, privacy, and offline evaluation on a representative device matrix.
-- Report measurements with reproducible conditions; do not treat the prototype as a road-safety system.
+- Use the repeatable physical-device benchmark procedure in `testing.md`; report only observed measurements. Do not treat the prototype as a road-safety system.

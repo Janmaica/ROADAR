@@ -6,12 +6,13 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -24,8 +25,8 @@ import androidx.compose.ui.unit.dp
 import com.roadar.app.ai.YOLO26_MODEL_ASSET
 import com.roadar.app.data.report.PotholeReportRepository
 import com.roadar.app.ui.components.EmptyStateCard
-import com.roadar.app.ui.components.PageHeader
 import com.roadar.app.ui.components.RoadarCard
+import com.roadar.app.ui.components.RoadarLogo
 import com.roadar.app.ui.components.SectionHeading
 import com.roadar.app.ui.components.StatusLine
 
@@ -33,6 +34,7 @@ import com.roadar.app.ui.components.StatusLine
 fun HomeScreen(
     onStartDetection: () -> Unit,
     onViewReports: () -> Unit,
+    onOpenMap: () -> Unit,
     reportRepository: PotholeReportRepository
 ) {
     val context = LocalContext.current
@@ -48,17 +50,11 @@ fun HomeScreen(
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         item {
-            PageHeader(
-                eyebrow = "Field research",
-                title = "Road awareness,\nmade practical.",
-                description = "A research prototype for exploring on-device pothole detection."
-            )
-        }
-        item {
             DetectionIntroCard(
                 hasModelAsset = hasModelAsset,
                 onStartDetection = onStartDetection,
-                onViewReports = onViewReports
+                onViewReports = onViewReports,
+                onOpenMap = onOpenMap
             )
         }
         item {
@@ -122,54 +118,94 @@ fun HomeScreen(
 private fun DetectionIntroCard(
     hasModelAsset: Boolean,
     onStartDetection: () -> Unit,
-    onViewReports: () -> Unit
+    onViewReports: () -> Unit,
+    onOpenMap: () -> Unit
 ) {
-    RoadarCard {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.primary,
+        tonalElevation = 2.dp
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(15.dp)
         ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+            ) {
+                RoadarLogo(modifier = Modifier.size(48.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        text = "ROAD CONDITION RESEARCH",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.78f),
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "YOLO26n · On-device AI",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
             Text(
-                text = "ROAD CONDITION RESEARCH",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.tertiary,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = "Explore the detection workspace",
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface,
+                text = "Smart pothole detection",
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onPrimary,
                 fontWeight = FontWeight.Bold
             )
             Text(
                 text = if (hasModelAsset) {
-                    "CameraX and the local YOLO26n model are ready for offline inference. Detections are not saved as reports."
+                    "Run inference on your device, then choose which detections to save with a verified location."
                 } else {
-                    "The rear-camera preview is ready. Add the excluded ONNX model asset to enable local inference."
+                    "Camera preview is available. Add the separately supplied ONNX asset to enable pothole detection."
                 },
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.84f)
             )
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Button(
                     onClick = onStartDetection,
+                    modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.tertiary,
-                        contentColor = MaterialTheme.colorScheme.onTertiary
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        contentColor = MaterialTheme.colorScheme.primary
                     ),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 12.dp)
                 ) {
                     Text("Start detection", fontWeight = FontWeight.SemiBold)
                 }
-                OutlinedButton(
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(
                     onClick = onViewReports,
+                    modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(14.dp),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    ),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 12.dp)
                 ) {
                     Text("View reports")
+                }
+                Button(
+                    onClick = onOpenMap,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    ),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 12.dp)
+                ) {
+                    Text("Open map")
                 }
             }
         }

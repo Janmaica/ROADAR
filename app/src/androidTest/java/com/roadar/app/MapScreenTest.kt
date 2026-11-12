@@ -43,7 +43,7 @@ class MapScreenTest {
         composeRule.onNodeWithTag("map_report_${report.id}")
             .performScrollTo()
             .performClick()
-        composeRule.onNodeWithText("Selected report · MANUAL").assertIsDisplayed()
+        composeRule.onNodeWithText("Selected report").assertIsDisplayed()
         composeRule.onNodeWithText(
             "Device position 14.599500, 120.984200"
         ).assertIsDisplayed()
@@ -59,7 +59,7 @@ class MapScreenTest {
         composeRule.onNodeWithText("No local reports yet").performScrollTo().assertIsDisplayed()
         assertEquals(
             0,
-            composeRule.onAllNodesWithText("Selected report · MANUAL")
+            composeRule.onAllNodesWithText("Selected report")
                 .fetchSemanticsNodes()
                 .size
         )
