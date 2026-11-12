@@ -1,55 +1,54 @@
 # Development roadmap
 
-The milestones below distinguish completed prototype work from future research work.
+The milestones below distinguish implemented prototype code from features that are disabled, deferred, or not yet verified.
 
 ## 1. App shell and interface — implemented
 
 - Compose/Material 3 theme with light and dark palettes.
-- Home, detection, reports, map, and settings screens.
-- Top-level navigation and a device connectivity indicator.
-- Clear, non-fabricated empty states for features not implemented.
+- Home, detection, reports, map, and settings screens with top-level navigation.
+- Connectivity status and empty states that do not fabricate results.
 
-## 2. CameraX live preview — implemented and verified on a physical device
+## 2. CameraX live preview — implemented; device-tested
 
-- Added stable CameraX preview, camera2, and lifecycle artifacts at version 1.4.2.
-- Added an on-demand CAMERA permission flow with retry and app-settings handling after permanent denial.
-- Bound the rear-camera Preview use case to the activity lifecycle and release it when leaving Detection.
-- Hosted PreviewView in the Compose Detection screen with portrait-friendly fill-center scaling and an initialization state.
-- CameraX `ImageAnalysis` now runs beside the preview with `STRATEGY_KEEP_ONLY_LATEST`; analyzer frames are always closed.
-- A connected Android 15 physical phone passed an instrumentation test that observed the preview stream, navigated away, and re-entered Detection successfully.
-- Permission denial/retry/settings recovery and camera-unavailable behavior still need manual verification on target devices.
+- CameraX rear-camera Preview and ImageAnalysis use cases, lifecycle-bound with latest-frame backpressure.
+- On-demand camera permission and preview cleanup when leaving Detection.
+- A Vivo V2430 running Android 15 passed the connected preview/re-entry instrumentation test.
 
-## 3. Stage 4 YOLO26n on-device inference — prototype implemented
+## 3. Stage 4 YOLO26n on-device inference — prototype implemented; research verification incomplete
 
-- **Verification status: incomplete.** Earlier build, instrumentation, and single-device checks were reported as passing, but the final repeated on-device benchmark was interrupted and broader validation remains outstanding.
-- The selected Stage 4 `best.pt` was validated and exported to fixed-shape FP32 ONNX; the source checkpoint is preserved and neither it nor the export is tracked.
-- ONNX Runtime Android 1.22.0 loads the local model asset, preprocesses frames, runs the actual pothole model, applies confidence filtering/NMS, and draws prediction boxes/labels.
-- A connected Android 15 phone passed a model test using a held-out Stage 4 pothole image and displayed live camera inference.
-- CPU inference is functional but slow on the tested phone (about 1.9 processed FPS in an observed sample); this is not yet validated for vehicle-speed field use. NNAPI session creation is incompatible with the exported graph on the tested phone.
-- Reports, GPS, and confidence-history persistence are not implemented.
+- Preserves the selected Stage 4 checkpoint and uses its fixed-shape FP32 ONNX export; model binaries remain excluded from Git.
+- ONNX Runtime CPU inference, frame preprocessing, output filtering/NMS, bounding boxes, and confidence labels.
+- Connected tests include a held-out Stage 4 pothole image and live camera analysis.
+- Broader device/field evaluation and a final repeated performance benchmark remain outstanding. An isolated CPU result is not evidence of road-speed suitability; NNAPI failed to initialize with this graph on the tested phone.
 
-## 4. Local reports and GPS — planned
+## 4. Manual GPS-based local reporting — implemented in code; end-to-end verification pending
 
-- Define report fields, validation rules, and how a user confirms a candidate detection.
-- Request location permission only when required; represent missing or stale location accurately.
-- Add Room persistence and test migrations and offline read/write behavior.
+- Room schema v1, UUID-keyed reports, DAO, IO-dispatched repository, generated/exported schema, and no destructive migration fallback.
+- One-shot fused location request after user confirmation; requests foreground approximate or precise permission, validates UTC/monotonic age and accuracy, and records the device position associated with the event.
+- Manual report action only appears for a real, current model detection. It requires explicit confirmation, saves confidence/model/timestamps/location with `PENDING` sync status, and reports success only after Room insertion.
+- Reports UI observes database rows and provides details and delete confirmation; Home reflects saved report count.
+- Local unit and connected tests cover fix validation, report construction, Room insert/query/observe/update/delete/persistence, and isolated report UI details/deletion.
+- Still requires manual on-device validation of permission outcomes, fresh/poor/unavailable fixes, actual save/readback with a live detection, airplane-mode persistence, and longer-term data migration policy.
 
-## 5. History and map — planned
+## 5. Automatic tracking — experimental; automatic persistence disabled
 
-- Render only locally stored report records.
-- Select a mapping provider and document its privacy, licensing, and network behavior.
-- Keep report history available without a map connection.
+- The Detection screen offers a manual/automatic mode selector; manual remains the default and unchanged.
+- Automatic mode runs a separate greedy IoU tracker on real YOLO26n boxes (default confidence 0.60, IoU 0.30, three consecutive frames; one missed frame tolerated).
+- Unit tests cover temporal confirmation, confidence/box filtering, multiple objects, track expiry/reacquisition, and once-per-track report marking.
+- UI reports active/paused state, GPS behavior, confidence, track confirmation, and an automatic-save count of zero.
+- Automatic Room persistence and location acquisition remain off: camera motion and reacquisition can assign a new track ID to an already-seen pothole. The tracker is not field-validated and has no spatial duplicate guarantee.
+- Validate on representative moving-camera footage before enabling any automatic saves.
 
-## 6. Background synchronization — planned
+## 6. Interactive map — online implementation; provider rendering verification pending
 
-- Define a backend API and authentication/security model first.
-- Use WorkManager constraints, retries, and idempotent upload semantics.
-- Show pending, synced, and failed states based on persisted synchronization results.
+- MapLibre Android 11.8.0 loads the MapTiler Streets v4 online style when a restricted user-supplied key is configured.
+- The map observes Room reports, renders one marker per row, supports pan/zoom/selection, report-ID navigation, and foreground one-shot device centering.
+- MapTiler and OpenStreetMap attribution links are displayed; a missing key or online map failure is surfaced, while local report details remain available.
+- A locally configured key enabled live Streets v4 rendering on the connected phone; a pan gesture was verified. The developer reports physically verifying saved-report markers and marker removal after report deletion; this was not repeated during the latest automated test run. Pinch zoom, marker taps, and location centering remain to be checked in a documented device session.
+- Offline report storage is implemented; offline basemap tiles/downloads are not. No tile prefetch or offline region download is used.
 
-## 7. Research evaluation — in progress
+## 7. Synchronization and research evaluation — planned/in progress
 
-- Define datasets, device matrix, and evaluation methodology.
-- Record model and application versions, inference latency, FPS, and detection metrics.
-- Evaluate offline behavior, battery/resource impact, and failure cases.
-- The Stage 4 held-out test split and one Android device have initial measurements documented in `testing.md`; broader device and field evaluations remain outstanding.
-- Report measured results separately from roadmap goals.
+- Define a backend/authentication contract before adding WorkManager and retries.
+- Broaden model, latency/FPS, geolocation accuracy, resource use, privacy, and offline evaluation on a representative device matrix.
+- Report measurements with reproducible conditions; do not treat the prototype as a road-safety system.

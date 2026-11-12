@@ -21,12 +21,19 @@ internal class DetectionSession(
     private val applicationContext = context.applicationContext
     private val mainExecutor = ContextCompat.getMainExecutor(context)
     private val closed = AtomicBoolean(false)
+    private val automaticTrackingRequested = AtomicBoolean(false)
+    private val tracker = PotholeDetectionTracker()
     private var started = false
+    private var automaticTrackingActive = false
     private var detector: OnnxPotholeDetector? = null
     private var failed = false
     private var fpsWindowStarted = 0L
     private var framesInFpsWindow = 0
     private var processedFps: Float? = null
+
+    fun setAutomaticTrackingEnabled(enabled: Boolean) {
+        automaticTrackingRequested.set(enabled)
+    }
 
     fun start() {
         if (started || closed.get()) return
@@ -73,6 +80,16 @@ internal class DetectionSession(
             val frame = activeDetector.detect(image)
             if (closed.get()) return
 
+            val requestedTracking = automaticTrackingRequested.get()
+            if (requestedTracking != automaticTrackingActive) {
+                tracker.clearActiveTracks()
+                automaticTrackingActive = requestedTracking
+            }
+            val trackingSnapshot = if (automaticTrackingActive) {
+                tracker.update(frame.detections)
+            } else {
+                null
+            }
             val now = android.os.SystemClock.elapsedRealtimeNanos()
             if (fpsWindowStarted == 0L) fpsWindowStarted = now
             framesInFpsWindow += 1
@@ -88,7 +105,18 @@ internal class DetectionSession(
                     modelLoadTimeMs = activeDetector.modelLoadTimeMs,
                     executionProvider = activeDetector.executionProvider,
                     latestFrame = frame,
-                    processedFps = processedFps
+                    processedFps = processedFps,
+                    tracking = trackingSnapshot?.let {
+                        DetectionTrackingUiState(
+                            isEnabled = true,
+                            activeTrackCount = it.tracks.size,
+                            confirmedTrackCount = it.confirmedTrackCount,
+                            qualifyingDetectionCount = it.qualifyingDetectionCount,
+                            latestConfidence = it.highestConfidence,
+                            confirmationProgress = it.confirmationProgress,
+                            confirmationsThisFrame = it.newlyConfirmedTrackIds.size
+                        )
+                    } ?: DetectionTrackingUiState()
                 )
             )
         } catch (exception: OrtException) {
@@ -119,6 +147,7 @@ internal class DetectionSession(
 
     override fun close() {
         if (!closed.compareAndSet(false, true)) return
+        automaticTrackingRequested.set(false)
         analyzerExecutor.execute {
             detector?.close()
             detector = null

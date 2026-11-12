@@ -35,6 +35,11 @@ import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import com.roadar.app.data.report.PotholeReportRepository
+import com.roadar.app.data.report.RoadarDatabase
+import com.roadar.app.data.report.RoomPotholeReportRepository
+import com.roadar.app.location.DeviceLocationProvider
+import com.roadar.app.location.FusedDeviceLocationProvider
 import com.roadar.app.ui.components.RoadarTopBar
 import com.roadar.app.ui.navigation.RoadarDestination
 import com.roadar.app.ui.screens.DetectionScreen
@@ -46,6 +51,14 @@ import com.roadar.app.ui.screens.SettingsScreen
 @Composable
 fun RoadarApp() {
     val context = LocalContext.current
+    val reportRepository: PotholeReportRepository = remember(context) {
+        RoomPotholeReportRepository(
+            RoadarDatabase.getInstance(context).potholeReportDao()
+        )
+    }
+    val deviceLocationProvider: DeviceLocationProvider = remember(context) {
+        FusedDeviceLocationProvider(context)
+    }
     val connectivityManager = remember(context) {
         context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
     }
@@ -54,6 +67,7 @@ fun RoadarApp() {
     }
     val currentDestinationState = remember { mutableStateOf(RoadarDestination.HOME) }
     val currentDestination by currentDestinationState
+    val mapReportIdState = remember { mutableStateOf<String?>(null) }
 
     DisposableEffect(connectivityManager) {
         val callback = object : ConnectivityManager.NetworkCallback() {
@@ -120,12 +134,27 @@ fun RoadarApp() {
                                 },
                                 onViewReports = {
                                     currentDestinationState.value = RoadarDestination.REPORTS
-                                }
+                                },
+                                reportRepository = reportRepository
                             )
 
-                            RoadarDestination.DETECTION -> DetectionScreen()
-                            RoadarDestination.REPORTS -> ReportsScreen()
-                            RoadarDestination.MAP -> MapScreen()
+                            RoadarDestination.DETECTION -> DetectionScreen(
+                                reportRepository = reportRepository,
+                                locationProvider = deviceLocationProvider
+                            )
+                            RoadarDestination.REPORTS -> ReportsScreen(
+                                reportRepository = reportRepository,
+                                onShowOnMap = { reportId ->
+                                    mapReportIdState.value = reportId
+                                    currentDestinationState.value = RoadarDestination.MAP
+                                }
+                            )
+                            RoadarDestination.MAP -> MapScreen(
+                                reportRepository = reportRepository,
+                                locationProvider = deviceLocationProvider,
+                                targetReportId = mapReportIdState.value,
+                                onTargetHandled = { mapReportIdState.value = null }
+                            )
                             RoadarDestination.SETTINGS -> SettingsScreen()
                         }
                     }

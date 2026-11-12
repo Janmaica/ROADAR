@@ -4,9 +4,11 @@ import android.Manifest
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -40,10 +42,9 @@ class CameraPreviewTest {
         composeRule.onNodeWithTag("navigation_reports").performClick()
         composeRule.onNodeWithTag("navigation_detection").performClick()
         composeRule.waitUntil(timeoutMillis = 20_000) {
-            composeRule.onAllNodesWithText("Preview active")
-                .fetchSemanticsNodes()
-                .isNotEmpty()
+            composeRule.onAllNodesWithText("Preview active").fetchSemanticsNodes().isNotEmpty()
         }
+        composeRule.onNodeWithText("Preview active").performScrollTo().assertIsDisplayed()
     }
 
     private fun verifyCameraInferenceMetricsWhenModelIsBundled() {
@@ -52,7 +53,20 @@ class CameraPreviewTest {
             .assets
             .list("")
             ?.contains(YOLO26_MODEL_ASSET) == true
-        if (!hasModel) return
+        if (!hasModel) {
+            composeRule.waitUntil(timeoutMillis = 20_000) {
+                composeRule.onAllNodesWithText("Pothole model unavailable")
+                    .fetchSemanticsNodes()
+                    .isNotEmpty()
+            }
+            composeRule.onNodeWithText("Pothole model unavailable")
+                .performScrollTo()
+                .assertIsDisplayed()
+            composeRule.onNodeWithText("Model file not found.", substring = true)
+                .performScrollTo()
+                .assertIsDisplayed()
+            return
+        }
 
         composeRule.waitUntil(timeoutMillis = 60_000) {
             composeRule.onAllNodesWithTag("detection_metric_inference")

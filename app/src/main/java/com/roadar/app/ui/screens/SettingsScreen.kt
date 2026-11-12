@@ -45,17 +45,30 @@ fun SettingsScreen() {
             InformationSection(
                 title = "Detection model",
                 rows = listOf(
-                    "Planned model" to "Fine-tuned YOLO26n",
-                    "Runtime status" to "Not integrated",
-                    "Model file" to "Not included"
+                    "Model" to "Fine-tuned YOLO26n · Stage 4",
+                    "Runtime" to "ONNX Runtime · CPU",
+                    "Model file" to "Local ignored asset required"
                 )
             )
         }
         item {
             InformationSection(
-                title = "Offline and synchronization",
+                title = "Reports and location",
                 rows = listOf(
-                    "Local reports" to "Not implemented",
+                    "Storage" to "Room · on device",
+                    "Reporting" to "Manual confirmation required",
+                    "Location" to "Foreground approximate or precise fix",
+                    "Coordinates" to "Device position associated with detection"
+                )
+            )
+        }
+        item {
+            InformationSection(
+                title = "Mapping and synchronization",
+                rows = listOf(
+                    "Interactive map" to "Deferred · source not selected",
+                    "Offline map tiles" to "Not configured or tested",
+                    "Automatic reporting" to "Disabled pending reliable tracking",
                     "Background sync" to "Not configured",
                     "Network status" to "Device connectivity only"
                 )
@@ -63,7 +76,7 @@ fun SettingsScreen() {
         }
         item {
             Text(
-                text = "The interface is an early development milestone. Detection, GPS, local data storage, mapping, and synchronization require future implementation and validation.",
+                text = "Manual local reporting is implemented in the prototype, but full on-device detection, permission, GPS, and report workflow validation remains outstanding. The map and synchronization are not available.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

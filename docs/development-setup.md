@@ -21,19 +21,29 @@ The app uses `compileSdk = 36`, `targetSdk = 35`, and `minSdk = 26`. Keep the ap
    java -version
    ```
 
-4. Build the debug app from the repository root:
+4. For local pothole inference, obtain the approved model from the project's authorized private model source. Follow [model asset instructions](model-assets.md) to place and checksum-verify it. The model is intentionally excluded from Git; without it, the app builds and camera preview works, but detection and detection-based reporting are disabled with an explicit status.
+
+5. To render the online basemap, create a MapTiler API key for the MapTiler Maps API. In the MapTiler key settings, restrict the mobile key with the allowed User-Agent substring `ROADAR-Android`. Add the key to the existing root `local.properties` file (do not replace its `sdk.dir` entry):
+
+   ```properties
+   MAPTILER_API_KEY=YOUR_RESTRICTED_MAPTILER_KEY
+   ```
+
+   MapTiler keys are public client credentials when shipped in an Android app, not secrets. Restrict usage, monitor the account's plan/quota, and rotate a compromised key. ROADAR injects the value into BuildConfig and sets a matching ROADAR User-Agent on map requests. `local.properties` is ignored by Git; never commit or paste the key into source, screenshots, or issue reports. Without the key, the app clearly indicates that the online basemap is not configured. Map tiles require an internet connection; offline basemap downloads are not implemented or permitted by ROADAR's current provider configuration.
+
+6. Build the debug app from the repository root:
 
    ```powershell
    .\gradlew.bat :app:assembleDebug
    ```
 
-5. Run local unit tests:
+7. Run local unit tests:
 
    ```powershell
    .\gradlew.bat :app:testDebugUnitTest
    ```
 
-6. To run instrumented UI tests, start an emulator or connect and authorize an Android device, then run:
+8. To run instrumented UI tests, start an emulator or connect and authorize an Android device, then run:
 
    ```powershell
    .\gradlew.bat :app:connectedDebugAndroidTest

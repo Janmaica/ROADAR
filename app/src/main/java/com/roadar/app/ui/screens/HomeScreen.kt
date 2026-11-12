@@ -14,12 +14,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.roadar.app.ai.YOLO26_MODEL_ASSET
+import com.roadar.app.data.report.PotholeReportRepository
 import com.roadar.app.ui.components.EmptyStateCard
 import com.roadar.app.ui.components.PageHeader
 import com.roadar.app.ui.components.RoadarCard
@@ -29,9 +32,12 @@ import com.roadar.app.ui.components.StatusLine
 @Composable
 fun HomeScreen(
     onStartDetection: () -> Unit,
-    onViewReports: () -> Unit
+    onViewReports: () -> Unit,
+    reportRepository: PotholeReportRepository
 ) {
     val context = LocalContext.current
+    val reportFlow = remember(reportRepository) { reportRepository.observeReports() }
+    val reports by reportFlow.collectAsState(initial = null)
     val hasModelAsset = remember(context) {
         context.assets.list("")?.contains(YOLO26_MODEL_ASSET) == true
     }
@@ -66,8 +72,8 @@ fun HomeScreen(
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     SummaryCard(
                         title = "Local reports",
-                        value = "Not available",
-                        detail = "Storage is not implemented",
+                        value = reports?.let { "${it.size} saved" } ?: "Loading",
+                        detail = "Stored on this device",
                         modifier = Modifier.weight(1f)
                     )
                     SummaryCard(
@@ -93,16 +99,21 @@ fun HomeScreen(
                             title = "Camera / model",
                             status = if (hasModelAsset) "Inference available" else "Model asset missing"
                         )
-                        StatusLine(title = "Report storage", status = "Not configured")
+                        StatusLine(
+                            title = "Report storage",
+                            status = reports?.let { "${it.size} saved locally" } ?: "Loading"
+                        )
                     }
                 }
             }
         }
         item {
-            EmptyStateCard(
-                title = "No reports recorded",
-                description = "Local report collection will be available after storage and detection are implemented."
-            )
+            if (reports?.isEmpty() == true) {
+                EmptyStateCard(
+                    title = "No reports recorded",
+                    description = "Confirm a real model detection and a recent device location to save a report."
+                )
+            }
         }
     }
 }

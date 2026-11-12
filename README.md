@@ -2,26 +2,26 @@
 
 **Development and Evaluation of an Offline-Capable Android Application for Pothole Detection Using a Fine-Tuned YOLO26n Model**
 
-> **Development status: on-device inference prototype; Phase 3 verification is incomplete.** CameraX preview and frame analysis run the selected Stage 4 YOLO26n ONNX model when its local asset is present. Previously reported device checks passed, but the final repeated performance benchmark and broader validation are outstanding. Detections are not saved; GPS, reports, maps, and synchronization are not implemented.
+> **Development status: research prototype.** ROADAR's Stage 4 YOLO26n inference integration, manual Room-backed reporting, and interactive MapLibre map are implemented. The ONNX model is a separately supplied local asset and is not included in this repository; without it, inference and detection-based report creation are unavailable while the app and camera preview can still build and run. The online basemap requires a locally configured MapTiler key; Streets v4 rendered on the connected development phone and a pan gesture was verified. Developers must configure their own key. Local reports are available offline, but offline basemap tiles are not implemented. Experimental tracking is available; automatic report persistence remains disabled pending field validation.
 
 ## Overview
 
-ROADAR is a Computer Engineering research project exploring an Android application for identifying potholes and supporting road-condition reporting. Its research goal is to evaluate a fine-tuned YOLO26n model running on-device, with future report capture designed to work when network access is unavailable.
+ROADAR is a Computer Engineering research project exploring an Android application for identifying potholes and supporting road-condition reporting. Its research goal is to evaluate a fine-tuned YOLO26n model running on-device and preserve manually confirmed reports locally when network access is unavailable.
 
-This repository contains the Android project foundation, a Jetpack Compose interface, CameraX live preview/analysis, and the inference integration for the selected fine-tuned Stage 4 YOLO26n checkpoint. Model/checkpoint/dataset binaries are intentionally excluded from Git. The app can only initialize inference when the matching local ONNX export is added to the app assets.
+This repository contains the Android project foundation, a Jetpack Compose interface, CameraX live preview/analysis, ONNX inference, Room-backed reports, and on-demand fused-device-location capture. Model/checkpoint/dataset binaries are intentionally excluded from Git. The app can only initialize inference when the matching local ONNX export is added to the app assets.
 
 ## Research motivation and objectives
 
 Road-condition observations can be difficult to collect consistently and share promptly. ROADAR aims to study whether an Android phone can support practical pothole detection and structured field reporting while keeping model inference and report capture available offline.
 
-The planned research objectives are to:
+The research objectives are to:
 
 1. Integrate and evaluate a fine-tuned YOLO26n model on Android.
 2. Measure inference latency, throughput (FPS), and detection confidence on target devices.
-3. Associate verified detections with GPS coordinates and timestamps.
+3. Associate user-confirmed detections with the device location and timestamps.
 4. Persist reports locally and explore synchronization when connectivity returns.
 
-These are project objectives, not claims about the current app.
+Manual local-reporting code is present, but its complete on-device workflow remains unverified. Automatic tracking can be exercised in Detection; it does not persist reports. Synchronization is not operational.
 
 ## Feature status
 
@@ -32,11 +32,19 @@ These are project objectives, not claims about the current app.
 | In-app navigation and device connectivity indicator | Implemented |
 | CameraX rear-camera live preview and runtime permission flow | Implemented; preview verified on a physical Android 15 phone |
 | CameraX ImageAnalysis with latest-frame backpressure | Implemented; analyzer releases each frame |
-| Fine-tuned Stage 4 YOLO26n model export and ONNX inference | Implemented; local ONNX asset is not included in Git |
-| Actual pothole boxes/confidence overlay | Implemented; tested with a held-out Stage 4 image and live camera |
+| Fine-tuned Stage 4 YOLO26n model export and ONNX inference | Integration implemented; separately supplied local ONNX asset is required and excluded from Git |
+| Actual pothole boxes/confidence overlay | Available with the verified local model asset; tested with a held-out Stage 4 image and live camera |
 | On-device performance instrumentation | Implemented for model load, inference, processing latency, and processed FPS; final repeated benchmark is incomplete |
-| GPS association and local report storage | Planned; not implemented |
-| Map visualization and background synchronization | Planned; not implemented |
+| Room database and repository | Implemented; schema v1, no destructive fallback, insert/query/observe/delete/sync-status operations |
+| Foreground location capture | Implemented using fused location; requests coarse/fine permission after report confirmation and rejects stale/inaccurate fixes |
+| Manual report workflow | Implemented in code using actual current model detections and confirmation; full camera/permission/GPS/database flow still needs device verification |
+| Reports history and details/deletion | Room-backed UI implemented; database and isolated UI tests added |
+| Automatic tracking | Experimental, configurable IoU tracker; 0.60 confidence / 3 consecutive frames by default; unit-tested, not field-validated |
+| Automatic report persistence | Disabled pending moving-camera track and duplicate-prevention validation; no automatic Room records or per-frame GPS requests |
+| Interactive online map | MapLibre Android 11.8.0 with Room-backed markers, report selection, Reports-to-map navigation, and device centering; requires a restricted user-supplied MapTiler key |
+| Offline report storage | Implemented with Room; locally stored report details remain available offline |
+| Offline basemap tiles | Not implemented; online tiles require network, and no offline-download rights/source is configured |
+| Background synchronization | Planned; not implemented |
 | Broader device/field performance evaluation | In progress; the tested phone's CPU throughput is not yet suitable evidence for road-speed use |
 
 The connectivity indicator reflects whether Android currently reports a validated internet connection. It does not indicate that report synchronization is available.
@@ -47,19 +55,22 @@ The connectivity indicator reflects whether Android currently reports a validate
 - Jetpack Compose and Material 3
 - CameraX 1.4.2 (Preview and ImageAnalysis)
 - ONNX Runtime Android 1.22.0 (CPU inference)
+- Room 2.7.2 (local report persistence)
+- Google Play services Location 21.3.0 (on-demand foreground location)
+- MapLibre Android 11.8.0 and OkHttp 4.12.0 (interactive online basemap and provider-specific User-Agent)
 - Android SDK 36 (`compileSdk`); minimum Android API 26; target API 35
 - Gradle Wrapper 8.11.1
 - Java 17
 
-Room, WorkManager, and a maps SDK are intentionally not included until their respective features are designed and implemented.
+The map uses MapTiler's documented online Maps API with visible MapTiler/OpenStreetMap attribution. Configure a restricted client key as described in [docs/development-setup.md](docs/development-setup.md); the key is packaged into the app and must not be treated as a secret. Do not download/prefetch tiles. No offline basemap is included; Room report data remains local and readable offline.
 
 ## Architecture
 
-The current app is a single-activity Compose application. `MainActivity` applies the app theme and hosts the app UI; screen selection is local Compose state with system-back handling and a bottom navigation bar. CameraX Preview and ImageAnalysis are lifecycle-bound. A single background analyzer uses latest-frame backpressure, converts YUV frames to normalized RGB tensors, executes the local ONNX model, applies confidence filtering and NMS, and overlays detections on the preview.
+The current app is a single-activity Compose application. `MainActivity` applies the app theme and hosts the app UI; screen selection is local Compose state with system-back handling and a bottom navigation bar. CameraX Preview and ImageAnalysis are lifecycle-bound. A single background analyzer uses latest-frame backpressure, converts YUV frames to normalized RGB tensors, executes the local ONNX model, applies confidence filtering and NMS, and overlays detections on the preview. Users can select manual reporting and confirm a fresh real detection, then grant approximate or precise foreground location and save its confidence plus the phone's location to the local Room database. Automatic mode runs the experimental IoU tracker on real frames; persistence remains disabled.
 
-The export contract is fixed at `[1, 3, 640, 640]` float32 RGB input and raw `[1, 5, 8400]` output. NMS is not embedded in this export. The current detector uses CPU inference; measured device performance and export comparisons are documented in [docs/testing.md](docs/testing.md). Detection results are transient and are not recorded or geotagged.
+The export contract is fixed at `[1, 3, 640, 640]` float32 RGB input and raw `[1, 5, 8400]` output. NMS is not embedded in this export. The current detector uses CPU inference; measured device performance and export comparisons are documented in [docs/testing.md](docs/testing.md). Reports keep detection-event time, report creation time, and location-fix time separately. Coordinates describe the device position associated with a detection, not a surveyed pothole coordinate. Report records are local; basemap rendering and synchronization require connectivity.
 
-Future work should introduce feature boundaries and data/domain layers only as real integrations are added. See [docs/architecture.md](docs/architecture.md) for the current design and a proposed evolution path.
+The tracker uses greedy IoU association, confidence thresholding, and three consecutive matching frames by default. Camera motion can split or switch tracks, so confirmed tracks are not saved automatically and no GPS request is made per frame. See [docs/architecture.md](docs/architecture.md) for tracking, map-provider terms, API-key behavior, and offline limitations.
 
 ## Project structure
 
@@ -70,13 +81,17 @@ Future work should introduce feature boundaries and data/domain layers only as r
 │   │   ├── androidTest/       # Device/emulator tests
 │   │   ├── main/
 │   │   │   ├── java/com/roadar/app/
+│   │   │   │   ├── data/report/ # Room entity, DAO, repository, report factory
+│   │   │   │   ├── location/    # Foreground fused-location provider and validation
+│   │   │   │   ├── ai/          # ONNX inference, preprocessing, tracking, postprocessing
 │   │   │   │   ├── ui/components/
 │   │   │   │   ├── ui/camera/
-│   │   │   ├── ai/             # ONNX inference, preprocessing, postprocessing
-│   │   │   ├── ui/navigation/
+│   │   │   │   ├── ai/          # ONNX inference, preprocessing, postprocessing
+│   │   │   │   ├── ui/navigation/
 │   │   │   │   ├── ui/screens/
 │   │   │   │   └── ui/theme/
 │   │   │   └── res/
+│   │   ├── schemas/             # Exported Room database schema
 │   │   └── test/               # Local JVM tests
 │   └── build.gradle.kts
 ├── docs/
@@ -116,15 +131,16 @@ If the Android SDK is not discovered automatically, configure the local SDK path
 
 ### Local model asset
 
-The selected checkpoint and exported model are not in Git. For local inference, place the verified FP32 export at `app/src/main/assets/roadar_yolo26n.onnx`. The default setup in this environment keeps the generated export at `$env:USERPROFILE\Documents\modelstage4\roadar_yolo26n.onnx`:
+The selected checkpoint and exported model are not distributed in this repository. Obtain the approved FP32 export from your authorized private model source and place it at `app/src/main/assets/roadar_yolo26n.onnx`:
 
 ```powershell
 New-Item -ItemType Directory -Force app\src\main\assets | Out-Null
-Copy-Item "$env:USERPROFILE\Documents\modelstage4\roadar_yolo26n.onnx" `
+Copy-Item "<approved-private-model-location>\roadar_yolo26n.onnx" `
   app\src\main\assets\roadar_yolo26n.onnx
+.\tools\verify-model.ps1
 ```
 
-The model file is ignored by Git. Without it, the project still builds and the camera preview works, but Detection reports that the model asset is missing. See [docs/testing.md](docs/testing.md) for the exact checkpoint/export contract and optional held-out image test.
+The model file is ignored by Git. Without it, the project still builds and the camera preview works, but real detection and manual report creation are unavailable; Detection displays an explicit unavailable-model state. The verification script checks the expected SHA-256 before use. See [docs/model-assets.md](docs/model-assets.md) for provenance, licensing uncertainty, and private distribution guidance.
 
 The debug APK is written to:
 
@@ -144,22 +160,22 @@ adb shell monkey -p com.roadar.app -c android.intent.category.LAUNCHER 1
 
 Run local unit tests with `.\gradlew.bat :app:testDebugUnitTest`. The navigation UI test requires a connected emulator or device and can be run with `.\gradlew.bat :app:connectedDebugAndroidTest`.
 
-Previously reported checks on a Vivo V2430 running Android 15 (API 35) include successful unit/build tasks, four connected instrumentation tests, installation and launch, and live camera detections without observed fatal startup errors. These checks do not complete Phase 3 verification: the final repeated on-device benchmark was interrupted, broader device and field evaluation remains outstanding, and the model/test assets are intentionally not included in Git. See [docs/testing.md](docs/testing.md) for scope and limitations. GPS, report storage, mapping, and synchronization remain unimplemented.
+On 2026-11-12, 14 local JVM tests and all 12 connected Android 15 (API 35) instrumentation tests passed on a Vivo V2430, and the debug app built successfully using JDK 21. The configured MapTiler Streets v4 basemap rendered on the phone and panning was verified. The developer also reports physically verifying that saved reports appear as map markers and deleting a report removes its marker; this manual check was not repeated during the latest automated run. Pinch zoom and current-location centering remain unverified. Full manual report creation with live detection, user-granted location, and a production database record was not verified in that run. See [docs/testing.md](docs/testing.md). Automatic persistence remains disabled; offline basemap tiles are not available.
 
 ## Development roadmap
 
-1. Complete broader camera permission/failure-state testing on target devices.
-2. Improve and evaluate mobile inference throughput without changing the selected Stage 4 checkpoint.
-3. Define report confirmation rules; associate eligible detections with timestamps and optional GPS, then persist reports locally with Room.
-4. Add report history and map visualization without blocking offline use.
-5. Add constrained background synchronization with WorkManager after a backend contract exists.
-6. Evaluate detection quality, latency, FPS, resource use, and offline behavior on a representative device matrix.
+1. Configure a MapTiler key restricted to the ROADAR User-Agent and verify live tiles, Room markers, report navigation, marker selection, attribution, and tile-failure UX on device.
+2. Verify manual report creation with real detections, approximate/precise permissions, location failure, and airplane mode.
+3. Validate IoU association, missed-frame behavior, and duplicate rates on representative moving-camera sequences before considering automatic persistence.
+4. Evaluate inference throughput without changing the selected Stage 4 checkpoint.
+5. Select an explicitly licensed offline map source only if offline basemaps are required; do not prefetch MapTiler or public OSM tiles.
+6. Add constrained background synchronization with WorkManager after a backend contract exists; broaden model/device evaluation.
 
 The roadmap is a plan, not a feature guarantee. See [docs/roadmap.md](docs/roadmap.md) for milestones and acceptance notes.
 
 ## Research disclaimer
 
-ROADAR is an active research prototype. It is not a validated road-safety, navigation, or infrastructure-maintenance system. The current model pipeline has not been validated for road-speed operation, can produce false detections, and does not save reports or collect location; do not rely on it for operational decisions.
+ROADAR is an active research prototype. It is not a validated road-safety, navigation, or infrastructure-maintenance system. The model pipeline is not validated for road-speed operation and can produce false detections. Manual reporting code records device position, which may not match the pothole's physical location; the end-to-end reporting flow has not been verified. Do not rely on it for operational decisions.
 
 ## Project board
 

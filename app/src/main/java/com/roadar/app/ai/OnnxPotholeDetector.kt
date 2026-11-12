@@ -63,15 +63,21 @@ internal class OnnxPotholeDetector(context: Context) : AutoCloseable {
 
     fun detect(image: ImageProxy): DetectionFrame {
         val started = SystemClock.elapsedRealtimeNanos()
-        return infer(Yolo26Preprocessor.fromImageProxy(image), started)
+        val detectionAtUtcMillis = System.currentTimeMillis()
+        return infer(Yolo26Preprocessor.fromImageProxy(image), started, detectionAtUtcMillis)
     }
 
     fun detect(bitmap: Bitmap): DetectionFrame {
         val started = SystemClock.elapsedRealtimeNanos()
-        return infer(Yolo26Preprocessor.fromBitmap(bitmap), started)
+        val detectionAtUtcMillis = System.currentTimeMillis()
+        return infer(Yolo26Preprocessor.fromBitmap(bitmap), started, detectionAtUtcMillis)
     }
 
-    private fun infer(input: PreparedModelInput, processingStartedNanos: Long): DetectionFrame {
+    private fun infer(
+        input: PreparedModelInput,
+        processingStartedNanos: Long,
+        detectionAtUtcMillis: Long
+    ): DetectionFrame {
         val tensor = OnnxTensor.createTensor(
             environment,
             FloatBuffer.wrap(input.nchwRgb),
@@ -101,6 +107,7 @@ internal class OnnxPotholeDetector(context: Context) : AutoCloseable {
             return DetectionFrame(
                 frameWidth = input.transform.sourceWidth,
                 frameHeight = input.transform.sourceHeight,
+                detectionAtUtcMillis = detectionAtUtcMillis,
                 detections = detections,
                 inferenceTimeMs = (inferenceFinished - inferenceStarted) / 1_000_000f,
                 processingLatencyMs = (finished - processingStartedNanos) / 1_000_000f

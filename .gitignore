@@ -1,10 +1,13 @@
 # Gradle and Android build output
 .gradle/
+.kotlin/
 /build/
 **/build/
 /captures/
 .externalNativeBuild/
 .cxx/
+*.apk
+*.aab
 
 # Machine-specific Android SDK configuration
 local.properties
@@ -13,9 +16,8 @@ local.properties
 .idea/
 *.iml
 
-# VS Code temporary or machine-specific files
-.vscode/*.log
-.vscode/*.tmp
+# VS Code machine-specific files
+.vscode/
 *.code-workspace
 
 # OS/editor temporary files
@@ -24,6 +26,9 @@ Thumbs.db
 *.swp
 *.swo
 *~
+**/__pycache__/
+*.py[cod]
+**/.ipynb_checkpoints/
 
 # Signing material and local secrets
 *.jks
