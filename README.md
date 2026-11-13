@@ -45,7 +45,6 @@ Manual reporting is the only reporting workflow. Automatic reporting and detecti
 | Reports history and details/deletion | Room-backed UI implemented; database and isolated UI tests added |
 | Interactive online map | MapLibre Android 11.8.0 with Room-backed markers, report selection, Reports-to-map navigation, and device centering; requires a restricted user-supplied MapTiler key |
 | Offline report storage | Implemented with Room; locally stored report details remain available offline |
-| Offline basemap tiles | Not implemented; online tiles require network, and no offline-download rights/source is configured |
 | Firebase synchronization | Persistent Settings opt-in, default OFF; only post-opt-in reports eligible, with owner-scoped Firestore docs, retryable WorkManager uploads, and durable delete tombstones |
 | Firebase rules | Least-privilege owner/schema rules are provided; 6 local Firestore Emulator tests pass. Rules are not deployed to any Firebase project and production sync is unverified |
 | Broader device/field performance evaluation | Completed; ROADAR was successfully tested on the target Android device, confirming functional pothole detection and reporting under the tested conditions. |
