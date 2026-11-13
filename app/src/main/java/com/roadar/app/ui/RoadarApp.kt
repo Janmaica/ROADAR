@@ -24,6 +24,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -41,6 +42,9 @@ import androidx.compose.ui.unit.dp
 import com.roadar.app.data.report.PotholeReportRepository
 import com.roadar.app.data.report.RoadarDatabase
 import com.roadar.app.data.report.RoomPotholeReportRepository
+import com.roadar.app.BuildConfig
+import com.roadar.app.data.sync.FirebaseSyncPreferences
+import com.roadar.app.data.sync.WorkManagerReportSyncScheduler
 import com.roadar.app.location.DeviceLocationProvider
 import com.roadar.app.location.FusedDeviceLocationProvider
 import com.roadar.app.ui.components.RoadarTopBar
@@ -55,9 +59,18 @@ import com.roadar.app.ui.screens.SettingsScreen
 fun RoadarApp() {
     val context = LocalContext.current
     val reportRepository: PotholeReportRepository = remember(context) {
+        val database = RoadarDatabase.getInstance(context)
         RoomPotholeReportRepository(
-            RoadarDatabase.getInstance(context).potholeReportDao()
+            database.potholeReportDao(),
+            syncScheduler = WorkManagerReportSyncScheduler(context),
+            syncEnabled = {
+                BuildConfig.FIREBASE_CONFIGURED &&
+                    FirebaseSyncPreferences.isEnabled(context)
+            }
         )
+    }
+    LaunchedEffect(reportRepository) {
+        reportRepository.requestSynchronization()
     }
     val deviceLocationProvider: DeviceLocationProvider = remember(context) {
         FusedDeviceLocationProvider(context)

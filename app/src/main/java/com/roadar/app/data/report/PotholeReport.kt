@@ -1,6 +1,8 @@
 package com.roadar.app.data.report
 
 import androidx.room.Entity
+import androidx.room.Index
+import androidx.room.ColumnInfo
 import androidx.room.PrimaryKey
 import androidx.room.TypeConverter
 import androidx.room.TypeConverters
@@ -58,7 +60,9 @@ data class PotholeReport(
     val modelVersion: String,
     val reportingMode: ReportingMode,
     val synchronizationStatus: SynchronizationStatus,
-    val imageReference: String? = null
+    val imageReference: String? = null,
+    @ColumnInfo(defaultValue = "0")
+    val syncEligible: Boolean = false
 ) {
     init {
         UUID.fromString(id)
@@ -86,3 +90,24 @@ data class PotholeReport(
         }
     }
 }
+
+@Entity(tableName = "firebase_sync_state")
+data class FirebaseSyncState(
+    @PrimaryKey val id: Int = SINGLETON_ID,
+    val ownerUid: String? = null,
+    val lastSuccessfulSyncUtcMillis: Long? = null,
+    val lastErrorCode: String? = null
+) {
+    companion object {
+        const val SINGLETON_ID = 1
+    }
+}
+
+@Entity(
+    tableName = "pending_report_deletions",
+    indices = [Index(value = ["queuedAtUtcMillis"])]
+)
+data class PendingReportDeletion(
+    @PrimaryKey val reportId: String,
+    val queuedAtUtcMillis: Long
+)

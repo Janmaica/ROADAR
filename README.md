@@ -6,7 +6,7 @@
 
 **Development and Evaluation of an Offline-Capable Android Application for Pothole Detection Using a Fine-Tuned YOLO26n Model**
 
-> **Development status: research prototype.** ROADAR provides local YOLO26n inference, one manual reporting workflow, Room-backed reports, and an interactive MapLibre map. The ONNX model is a separately supplied local asset and is not included in this repository; without it, inference and detection-based report creation are unavailable while the app and camera preview can still build and run. The online basemap requires a locally configured MapTiler key; Streets v4 rendered on the connected development phone and a pan gesture was verified. Developers must configure their own key. Local reports are available offline, but offline basemap tiles are not implemented. Synchronization is blocked pending an authorized backend/API.
+> **Development status: research prototype.** ROADAR provides local YOLO26n inference, manual reporting, Room-backed reports, an interactive MapLibre map, and optional Firebase Auth/Firestore synchronization. The Firebase Sync setting is persistent and defaults OFF; existing reports remain local-only, and only reports created while sync is enabled are eligible. Firebase/MapTiler configuration stays local. Cloud synchronization has only been exercised with the local Firestore Emulator—not against a production Firebase project.
 
 ## Overview
 
@@ -23,9 +23,9 @@ The research objectives are to:
 1. Integrate and evaluate a fine-tuned YOLO26n model on Android.
 2. Measure inference latency, throughput (FPS), and detection confidence on target devices.
 3. Associate user-confirmed detections with the device location and timestamps.
-4. Persist reports locally and evaluate synchronization when connectivity returns, subject to an authorized backend/API.
+4. Persist reports locally and evaluate optional synchronization to an explicitly authorized Firebase project.
 
-Manual reporting is the only reporting workflow. Automatic reporting and detection tracking have been removed. Synchronization is not operational because no authorized destination or upload contract is configured.
+Manual reporting is the only reporting workflow. Automatic reporting and detection tracking have been removed. When locally configured, the app queues report uploads and deletions through WorkManager; otherwise reports remain local-only.
 
 ## Feature status
 
@@ -39,17 +39,18 @@ Manual reporting is the only reporting workflow. Automatic reporting and detecti
 | Fine-tuned Stage 4 YOLO26n model export and ONNX inference | Integration implemented; separately supplied local ONNX asset is required and excluded from Git |
 | Actual pothole boxes/confidence overlay | Available with the verified local model asset; tested with a held-out Stage 4 image and live camera |
 | On-device performance instrumentation | Live rolling inference mean/min/max/median/p95, average pipeline latency, processing-only rate estimate, processed frames, and detections are displayed; controlled repeated benchmark remains incomplete |
-| Room database and repository | Implemented; schema v1, no destructive fallback, insert/query/observe/delete/sync-status operations |
+| Room database and repository | Implemented; schema v3, explicit non-destructive v1→v3 migrations, insert/query/observe/delete and sync outbox |
 | Foreground location capture | Implemented using fused location; requests coarse/fine permission after report confirmation and rejects stale/inaccurate fixes |
 | Manual report workflow | Only reporting method; real current model detections require user confirmation and a fresh validated foreground location before Room insertion |
 | Reports history and details/deletion | Room-backed UI implemented; database and isolated UI tests added |
 | Interactive online map | MapLibre Android 11.8.0 with Room-backed markers, report selection, Reports-to-map navigation, and device centering; requires a restricted user-supplied MapTiler key |
 | Offline report storage | Implemented with Room; locally stored report details remain available offline |
 | Offline basemap tiles | Not implemented; online tiles require network, and no offline-download rights/source is configured |
-| Report synchronization | Blocked; no authorized backend, endpoint, credentials, or idempotent upload contract is configured |
+| Firebase synchronization | Persistent Settings opt-in, default OFF; only post-opt-in reports eligible, with owner-scoped Firestore docs, retryable WorkManager uploads, and durable delete tombstones |
+| Firebase rules | Least-privilege owner/schema rules are provided; 6 local Firestore Emulator tests pass. Rules are not deployed to any Firebase project and production sync is unverified |
 | Broader device/field performance evaluation | In progress; the tested phone's CPU throughput is not yet suitable evidence for road-speed use |
 
-The connectivity indicator reflects whether Android currently reports a validated internet connection. It does not indicate that report synchronization is available.
+The connectivity indicator reflects whether Android currently reports a validated internet connection. It does not guarantee that Firebase is configured or that Firestore rules have been deployed.
 
 ## Technology stack
 
@@ -58,13 +59,15 @@ The connectivity indicator reflects whether Android currently reports a validate
 - CameraX 1.4.2 (Preview and ImageAnalysis)
 - ONNX Runtime Android 1.22.0 (CPU inference)
 - Room 2.7.2 (local report persistence)
+- Firebase Authentication and Cloud Firestore (optional, local-project configuration)
+- WorkManager 2.12.0 (network-constrained retry and sync outbox processing)
 - Google Play services Location 21.3.0 (on-demand foreground location)
 - MapLibre Android 11.8.0 and OkHttp 4.12.0 (interactive online basemap and provider-specific User-Agent)
 - Android SDK 36 (`compileSdk`); minimum Android API 26; target API 35
 - Gradle Wrapper 8.11.1
-- Java 17
+- JDK 21 (Java source/bytecode compatibility remains configured separately)
 
-Camera preview, YOLO26n inference, and Room report storage are local and do not require a backend connection. Manual report saving still requires a valid fresh device location; whether the phone can obtain a fix without network access depends on its GPS and environment. The map uses MapTiler's documented online Maps API with visible MapTiler/OpenStreetMap attribution. Configure a restricted client key as described in [docs/development-setup.md](docs/development-setup.md); the key is packaged into the app and must not be treated as a secret. Do not download/prefetch tiles. No offline basemap is included; Room report data remains local and readable offline.
+Camera preview, YOLO26n inference, and Room report storage are local. Manual report saving still requires a valid fresh device location; whether the phone can obtain a fix without network access depends on its GPS and environment. The map uses MapTiler's documented online Maps API with visible MapTiler/OpenStreetMap attribution. Configure a restricted client key as described in [docs/development-setup.md](docs/development-setup.md); the key is packaged into the app and must not be treated as a secret. Do not download/prefetch tiles. No offline basemap is included; Room report data remains local and readable offline. If Firebase is configured, report coordinates, accuracy, confidence, and timestamps are uploaded to the configured project under a persistent anonymous owner; deleting a local report queues its cloud deletion. Review the sync/privacy behavior and emulator-test the rules before enabling a project.
 
 ## Architecture
 
@@ -84,6 +87,7 @@ The report stores the device position associated with the detection, not a surve
 │   │   ├── main/
 │   │   │   ├── java/com/roadar/app/
 │   │   │   │   ├── data/report/ # Room entity, DAO, repository, report factory
+│   │   │   │   ├── data/sync/   # Firebase stores, sync coordinator, WorkManager worker
 │   │   │   │   ├── location/    # Foreground fused-location provider and validation
 │   │   │   │   ├── ai/          # ONNX inference, preprocessing, postprocessing, metrics
 │   │   │   │   ├── ui/components/
@@ -105,6 +109,8 @@ The report stores the device position associated with the detection, not a surve
 │   ├── libs.versions.toml
 │   └── wrapper/
 ├── .github/workflows/android.yml
+├── firestore.rules
+├── firebase.json
 ├── build.gradle.kts
 ├── gradle.properties
 └── settings.gradle.kts
@@ -113,11 +119,11 @@ The report stores the device position associated with the detection, not a surve
 ## Prerequisites
 
 - Android SDK Platform 36 and Android SDK Platform-Tools.
-- JDK 17. Android Studio's bundled JBR is suitable.
+- JDK 21. Android Studio's bundled JBR is suitable.
 - A Windows development environment can use the checked-in Gradle Wrapper (`gradlew.bat`); macOS/Linux can use `./gradlew`.
 - Android Studio or VS Code with Kotlin/Android tooling for editing. Android Studio is not required to run the Gradle commands.
 
-See [docs/development-setup.md](docs/development-setup.md) for setup details.
+See [docs/development-setup.md](docs/development-setup.md) for Android, MapTiler, and optional Firebase setup.
 
 ## Build with VS Code and Gradle
 
@@ -162,14 +168,14 @@ adb shell monkey -p com.roadar.app -c android.intent.category.LAUNCHER 1
 
 Run local unit tests with `.\gradlew.bat :app:testDebugUnitTest`. The navigation UI test requires a connected emulator or device and can be run with `.\gradlew.bat :app:connectedDebugAndroidTest`.
 
-On 2026-11-12, the current source passed 12 local JVM tests and 12 connected Android 15 (API 35) tests on a Vivo V2430, and the debug APK installed and launched. The configured MapTiler Streets v4 basemap rendered and panning was verified in an earlier device session. The developer also reports a prior physical check of manual report creation, saved report markers, and marker deletion; those interactions were not repeated during this verification. Pinch zoom, current-location centering, and airplane-mode operation remain unverified. See [docs/testing.md](docs/testing.md) for details and a repeatable physical-device benchmark procedure.
+On 2026-11-13, `:app:testDebugUnitTest`, all 16 connected Android tests, all six Firestore Emulator rules tests, and `:app:assembleDebug` passed using JDK 21. Connected tests included the v1→v2→v3 Room migration. The APK was installed and launched on the Vivo V2430 with Firebase Sync OFF; no live Firebase synchronization or production rules deployment was attempted. See [docs/testing.md](docs/testing.md) for verification scope and remaining limitations.
 
 ## Development roadmap
 
 1. Re-verify manual report creation with real detections, approximate/precise permissions, GPS-disabled/unavailable conditions, and airplane mode.
 2. Verify live map tiles, Room markers, report navigation, marker selection/deletion synchronization, attribution, and tile-failure UX on device.
 3. Run the documented repeated inference benchmark on the target Vivo V2430 without changing the selected Stage 4 checkpoint.
-4. Keep report synchronization blocked until an authorized backend, authentication method, endpoint, and idempotent request contract are supplied.
+4. Validate optional Firebase synchronization only in an explicitly authorized test project; review and deploy Firestore rules separately before enabling a project.
 5. Select an explicitly licensed offline map source only if offline basemaps are required; do not prefetch MapTiler or public OSM tiles.
 6. Broaden device evaluation and complete the research documentation without overstating prototype accuracy or road-speed suitability.
 

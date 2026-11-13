@@ -7,6 +7,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.roadar.app.data.report.LocationSource
+import com.roadar.app.data.report.FirebaseSyncState
 import com.roadar.app.data.report.PotholeReport
 import com.roadar.app.data.report.PotholeReportRepository
 import com.roadar.app.data.report.ReportingMode
@@ -79,8 +80,12 @@ class ReportsScreenTest {
 
     private class InMemoryReportRepository(initial: PotholeReport) : PotholeReportRepository {
         private val reports = MutableStateFlow(listOf(initial))
+        private val syncState = MutableStateFlow<FirebaseSyncState?>(null)
+        private val pendingDeletions = MutableStateFlow(0)
 
         override fun observeReports(): Flow<List<PotholeReport>> = reports
+        override fun observeSyncState(): Flow<FirebaseSyncState?> = syncState
+        override fun observePendingDeletionCount(): Flow<Int> = pendingDeletions
 
         override suspend fun getReports(): List<PotholeReport> = reports.value
 
@@ -103,6 +108,10 @@ class ReportsScreenTest {
                 if (it.id == id) it.copy(synchronizationStatus = status) else it
             }
         }
+
+        override suspend fun retryFailedSynchronization(): Int = 0
+
+        override fun requestSynchronization() = Unit
     }
 
     private companion object {

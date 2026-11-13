@@ -24,7 +24,7 @@ The milestones below distinguish implemented prototype code from features that a
 
 ## 4. Manual GPS-based local reporting — implemented in code; end-to-end verification pending
 
-- Room schema v1, UUID-keyed reports, DAO, IO-dispatched repository, generated/exported schema, and no destructive migration fallback.
+- Room schema v3, UUID-keyed reports, DAO, IO-dispatched repository, exported schemas, and non-destructive v1→v2→v3 migrations. The latest migration preserves prior rows and marks them ineligible for cloud sync.
 - One-shot fused location request after user confirmation; requests foreground approximate or precise permission, validates UTC/monotonic age and accuracy, and records the device position associated with the event.
 - Manual report action only appears for a real, current model detection. It requires explicit confirmation, saves confidence/model/timestamps/location with `PENDING` sync status, and reports success only after Room insertion.
 - Reports UI observes database rows and provides details and delete confirmation; Home reflects saved report count.
@@ -36,7 +36,7 @@ The milestones below distinguish implemented prototype code from features that a
 - The Detection screen has a single **Save Report** workflow for recent actual model detections; users confirm before any location request or persistence.
 - Fused foreground location is validated for coordinate ranges, freshness, and accuracy. Permission denial, unavailable/disabled location, invalid fixes, and inaccurate fixes must leave the report unsaved with visible feedback.
 - New reports are inserted through the existing Room repository and contain detection confidence, model metadata, UTC timestamps, and the associated device location.
-- Room schema v1 and the legacy reporting-mode converter are preserved. No destructive migration is required; new reports are marked `MANUAL`.
+- Room schema v3 retains the legacy reporting-mode converter and migrates prior versions without deleting reports; new reports are marked `MANUAL` and sync-eligible only if created while explicit sync opt-in is enabled.
 - Re-run device validation for precise/approximate permission, offline valid-fix availability, unavailable GPS, save/readback, restart persistence, and report deletion.
 
 ## 6. Interactive map — online implementation; provider rendering verification pending
@@ -47,8 +47,13 @@ The milestones below distinguish implemented prototype code from features that a
 - A locally configured key enabled live Streets v4 rendering on the connected phone; a pan gesture was verified. The developer reports physically verifying saved-report markers and marker removal after report deletion; this was not repeated during the latest automated test run. Pinch zoom, marker taps, and location centering remain to be checked in a documented device session.
 - Offline report storage is implemented; offline basemap tiles/downloads are not. No tile prefetch or offline region download is used.
 
-## 7. Synchronization and research evaluation — synchronization blocked
+## 7. Local-first Firebase synchronization — implemented; live project validation pending
 
-- The research objective includes synchronization when connectivity returns, but no authorized backend, endpoint, authentication details, or idempotent upload contract is configured. Do not implement an invented destination; request the approved infrastructure before adding WorkManager/retries.
+- Firebase synchronization requires the ignored `app/google-services.json` and a persistent Settings switch that defaults OFF and requires confirmation to enable.
+- Room schema v3 uses a non-destructive migration that leaves every preexisting report local-only. Only reports created after opt-in are eligible; workers recheck the setting before Firebase initialization and every remote operation.
+- Eligible report IDs, bounded batches, server acknowledgments, network constraints, exponential retry, and local sync status are implemented. Eligible local deletions keep durable tombstones while sync is off, preventing stale uploads from restoring deleted cloud reports.
+- `firestore.rules` restricts access to the authenticated owner and enforces the report schema. Six Firestore Emulator rules tests and focused JVM coordinator tests are present.
+- No production rules were deployed and no live Firebase data was read or changed. Before use, verify project ownership, enable anonymous authentication, review and publish the rules manually, and confirm the privacy/retention policy for uploading coordinates and detection metadata.
+- Startup/worker checks keep sync inactive when the setting is OFF; preexisting reports are never eligible for automatic upload. Real-project synchronization, production rules review, and field/privacy validation remain pending.
 - Broaden model, latency/FPS, geolocation accuracy, resource use, privacy, and offline evaluation on a representative device matrix.
 - Use the repeatable physical-device benchmark procedure in `testing.md`; report only observed measurements. Do not treat the prototype as a road-safety system.

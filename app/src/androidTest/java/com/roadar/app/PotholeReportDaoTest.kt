@@ -8,13 +8,17 @@ import com.roadar.app.data.report.LocationSource
 import com.roadar.app.data.report.PotholeReport
 import com.roadar.app.data.report.ReportingMode
 import com.roadar.app.data.report.RoadarDatabase
+import com.roadar.app.data.report.RoomPotholeReportRepository
 import com.roadar.app.data.report.SynchronizationStatus
+import com.roadar.app.data.sync.ReportSyncScheduler
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -80,6 +84,59 @@ class PotholeReportDaoTest {
 
         assertEquals(report, database.potholeReportDao().getById(report.id))
     }
+
+    @Test
+    fun newReportsAreEligibleOnlyWhenSyncWasEnabledAtInsertion() = runBlocking {
+        var disabledEnqueues = 0
+        val disabledRepository = RoomPotholeReportRepository(
+            database.potholeReportDao(),
+            syncScheduler = ReportSyncScheduler { disabledEnqueues += 1 },
+            syncEnabled = { false }
+        )
+        val localReport = sampleReport()
+        disabledRepository.insert(localReport)
+
+        assertFalse(database.potholeReportDao().getById(localReport.id)?.syncEligible ?: true)
+        assertEquals(0, disabledEnqueues)
+
+        var enabledEnqueues = 0
+        val enabledRepository = RoomPotholeReportRepository(
+            database.potholeReportDao(),
+            syncScheduler = ReportSyncScheduler { enabledEnqueues += 1 },
+            syncEnabled = { true }
+        )
+        val eligibleReport = sampleReport().copy(id = UUID.randomUUID().toString())
+        enabledRepository.insert(eligibleReport)
+
+        assertTrue(database.potholeReportDao().getById(eligibleReport.id)?.syncEligible ?: false)
+        assertEquals(1, enabledEnqueues)
+    }
+
+    @Test
+    fun localOnlyDeletionDoesNotQueueRemoteWorkButEligibleDeletionPersistsTombstone() =
+        runBlocking {
+            val dao = database.potholeReportDao()
+            val localReport = sampleReport()
+            dao.insert(localReport)
+            assertTrue(dao.deleteAndQueueRemoteDeletion(localReport.id, 1_800_000_001_000L))
+            assertNull(dao.getNextPendingDeletion())
+
+            val eligibleReport = sampleReport().copy(
+                id = UUID.randomUUID().toString(),
+                syncEligible = true
+            )
+            dao.insert(eligibleReport)
+            assertTrue(
+                dao.deleteAndQueueRemoteDeletion(eligibleReport.id, 1_800_000_002_000L)
+            )
+            assertNull(dao.getById(eligibleReport.id))
+            assertEquals(eligibleReport.id, dao.getNextPendingDeletion()?.reportId)
+
+            database.close()
+            database = newDatabase()
+
+            assertEquals(eligibleReport.id, database.potholeReportDao().getNextPendingDeletion()?.reportId)
+        }
 
     private fun newDatabase() =
         Room.databaseBuilder(context, RoadarDatabase::class.java, databaseName).build()

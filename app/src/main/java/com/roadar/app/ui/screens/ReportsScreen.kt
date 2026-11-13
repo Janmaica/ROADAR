@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -32,10 +33,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.roadar.app.data.report.PotholeReport
 import com.roadar.app.data.report.PotholeReportRepository
+import com.roadar.app.data.report.FirebaseSyncState
+import com.roadar.app.data.report.SynchronizationStatus
+import com.roadar.app.BuildConfig
 import com.roadar.app.ui.components.EmptyStateCard
 import com.roadar.app.ui.components.PageHeader
 import com.roadar.app.ui.components.RoadarCard
 import com.roadar.app.ui.components.SectionHeading
+import com.roadar.app.ui.components.StatusLine
 import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
@@ -52,6 +57,12 @@ fun ReportsScreen(
 ) {
     val reportFlow = remember(reportRepository) { reportRepository.observeReports() }
     val reports by reportFlow.collectAsState(initial = null)
+    val syncStateFlow = remember(reportRepository) { reportRepository.observeSyncState() }
+    val syncState by syncStateFlow.collectAsState(initial = null)
+    val pendingDeletionFlow = remember(reportRepository) {
+        reportRepository.observePendingDeletionCount()
+    }
+    val pendingDeletionCount by pendingDeletionFlow.collectAsState(initial = 0)
     val loadedReports = reports
     val scope = rememberCoroutineScope()
     var selectedReport by remember { mutableStateOf<PotholeReport?>(null) }
@@ -68,6 +79,26 @@ fun ReportsScreen(
                 eyebrow = "Local history",
                 title = "Pothole reports",
                 description = "Reports are stored on this device. Coordinates represent the device position associated with each detection."
+            )
+        }
+        item {
+            CloudSyncCard(
+                isConfigured = BuildConfig.FIREBASE_CONFIGURED,
+                reports = loadedReports.orEmpty(),
+                syncState = syncState,
+                pendingDeletionCount = pendingDeletionCount,
+                onSyncNow = reportRepository::requestSynchronization,
+                onRetryFailed = {
+                    scope.launch {
+                        try {
+                            reportRepository.retryFailedSynchronization()
+                            errorMessage = null
+                        } catch (exception: SQLiteException) {
+                            Log.e(TAG, "Could not retry failed report synchronization.", exception)
+                            errorMessage = "Synchronization could not be retried. Please try again."
+                        }
+                    }
+                }
             )
         }
         item {
@@ -184,6 +215,94 @@ fun ReportsScreen(
             }
         )
     }
+}
+
+@Composable
+private fun CloudSyncCard(
+    isConfigured: Boolean,
+    reports: List<PotholeReport>,
+    syncState: FirebaseSyncState?,
+    pendingDeletionCount: Int,
+    onSyncNow: () -> Unit,
+    onRetryFailed: () -> Unit
+) {
+    val pendingReports = reports.count {
+        it.synchronizationStatus == SynchronizationStatus.PENDING
+    }
+    val failedReports = reports.count {
+        it.synchronizationStatus == SynchronizationStatus.FAILED
+    }
+    val synchronizedReports = reports.count {
+        it.synchronizationStatus == SynchronizationStatus.SYNCED
+    }
+    val statusText = when {
+        !isConfigured ->
+            "Firebase is not configured. Reports remain saved locally on this device."
+        syncState?.lastErrorCode == "ACCOUNT_IDENTITY_MISMATCH" ->
+            "Sync is paused because the saved anonymous identity changed. ROADAR will not upload reports under a different account."
+        syncState?.lastErrorCode != null ->
+            syncErrorMessage(syncState.lastErrorCode)
+        pendingReports > 0 || pendingDeletionCount > 0 ->
+            "Waiting for network access and server acknowledgment."
+        syncState?.lastSuccessfulSyncUtcMillis != null ->
+            "Last server acknowledgment: ${formatReportTime(syncState.lastSuccessfulSyncUtcMillis)}"
+        else ->
+            "No server synchronization has completed on this installation."
+    }
+
+    RoadarCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Cloud synchronization",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = statusText,
+                style = MaterialTheme.typography.bodySmall,
+                color = if (syncState?.lastErrorCode != null) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                }
+            )
+            StatusLine(title = "Pending uploads", status = pendingReports.toString())
+            StatusLine(title = "Synchronized", status = synchronizedReports.toString())
+            StatusLine(title = "Failed uploads", status = failedReports.toString())
+            StatusLine(title = "Pending deletions", status = pendingDeletionCount.toString())
+            if (isConfigured) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Button(onClick = onSyncNow) {
+                        Text("Sync now")
+                    }
+                    if (failedReports > 0) {
+                        OutlinedButton(onClick = onRetryFailed) {
+                            Text("Retry failed")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun syncErrorMessage(errorCode: String): String = when (errorCode) {
+    "FIRESTORE_PERMISSION_DENIED" ->
+        "Firestore denied the operation. Check Authentication and published Firestore rules."
+    "ANONYMOUS_AUTHENTICATION_FAILED" ->
+        "Anonymous Authentication is unavailable. Check the Firebase project configuration."
+    "FIREBASE_INITIALIZATION_FAILED" ->
+        "Firebase could not initialize. Local reports remain available."
+    "FIRESTORE_REJECTED_REPORT" ->
+        "Firestore rejected a report. Review the report schema and published rules."
+    else ->
+        "Synchronization needs attention ($errorCode). Local reports remain available."
 }
 
 @Composable

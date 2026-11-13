@@ -11,6 +11,7 @@
 
 # Machine-specific Android SDK configuration
 local.properties
+/app/google-services.json
 
 # Android Studio / IntelliJ
 .idea/
@@ -50,3 +51,9 @@ secrets.properties
 **/best_ncnn_model/
 /datasets/
 app/src/androidTest/assets/roadar-stage4-pothole.jpg
+
+# Local Firebase emulator and rules-test dependencies
+node_modules/
+.firebase/
+firebase-debug.log
+firestore-debug.log

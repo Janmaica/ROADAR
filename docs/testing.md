@@ -9,6 +9,8 @@ From the repository root:
 .\gradlew.bat :app:assembleDebug
 .\gradlew.bat :app:compileDebugAndroidTestKotlin
 .\gradlew.bat :app:connectedDebugAndroidTest
+npm ci
+npm run test:firestore-rules
 ```
 
 The connected tests require an authorized Android device or emulator. Model-inference tests also require the ignored ONNX model and held-out image assets.
@@ -26,22 +28,17 @@ Run `.\tools\verify-model.ps1` after placing the authorized model asset locally.
 - `CameraPreviewTest` grants camera permission, waits for streaming, navigates away and back, and waits for the preview to resume.
 - `PotholeInferenceInstrumentedTest` exercises actual model inference on the ignored held-out Stage 4 image when assets are present.
 
-## Latest verification — 2026-11-12
+## Latest verification — 2026-11-13
 
-On the connected Vivo V2430 running Android 15 (API 35):
-
-- `:app:testDebugUnitTest`, `:app:connectedDebugAndroidTest`, and `:app:assembleDebug` passed using Android Studio's bundled JDK 21. Results: 12 JVM tests passed; all 12 connected tests passed with 0 failures and 0 skips.
-- Connected coverage included actual held-out model inference, Room persistence, isolated report and map-list selection/deletion, camera streaming/re-entry, navigation, and the manual-only Detection screen. The reports/markers used isolated test data; the connected suite did not create or delete production records.
-- The final APK was installed using `adb install -r` without clearing app data and launched on the Vivo. `MainActivity` was resumed, and no app fatal exception appeared in the inspected recent logcat buffer.
-- In an earlier device session, MapTiler Streets v4 rendered and a pan gesture was visibly verified. The developer reports previously verifying manual report creation, marker display, and marker deletion; these interactions were not repeated in this run. Pinch zoom and current-location centering remain unverified.
-- The local model checksum script passed. `local.properties` and the ONNX asset remain ignored and untracked; the key was not found in tracked files, and no files were staged.
-- No Room schema change was made. Existing schema-v1 records remain compatible, including the retained legacy reporting-mode enum value.
-- No controlled inference benchmark or airplane-mode test was performed. The metrics shown are exploratory session measurements, not controlled benchmark results; see the repeatable procedure below.
-- Source-only verification was also run with the ignored ONNX asset temporarily absent and restored afterward: `:app:assembleDebug`, `:app:testDebugUnitTest`, and `:app:connectedDebugAndroidTest` passed; the inference-specific instrumentation test skipped as expected, and the camera test verified the explicit missing-model message. The generated APK was confirmed not to contain `assets/roadar_yolo26n.onnx`.
-- The database schema was generated and exported as `app/schemas/com.roadar.app.data.report.RoadarDatabase/1.json`.
-- Debug APK was produced at `app/build/outputs/apk/debug/app-debug.apk`.
-
-This verification did **not** repeat the complete production manual-report flow with a fresh location fix, permission denial/approximate-vs-precise cases, GPS disabled, airplane mode, or marker interaction against existing production records. The developer reports that manual report creation, map markers, and marker deletion were physically verified in an earlier session; the current automated tests use isolated records. Room's file-backed instrumentation test verifies persistence across database close/reopen.
+- Android Studio's bundled JDK 21 was used. `:app:kspDebugKotlin` passed and exported Room schemas v2 and v3 after the sync entities were made top-level Room entities.
+- A `:app:compileDebugKotlin` run with the local Firebase config temporarily absent passed; the original ignored config was restored, the configured `FIREBASE_CONFIGURED` flag was checked without printing values, and the final configured APK was rebuilt.
+- `:app:testDebugUnitTest` passed. The full `:app:connectedDebugAndroidTest` suite passed all 16 tests on the Vivo V2430, including the v1→v2→v3 Room migration and the default-off/confirmation Settings test. A first full run stalled after the local Android test harness lost its gRPC connection; rerunning the complete suite passed.
+- `npm run test:firestore-rules` passed all 6 tests against the local Firestore Emulator with the `demo-roadar-rules` project. The first attempt failed because the shell selected an older Java runtime; rerunning with the bundled JDK 21 passed. No Firebase production project was contacted and rules were not deployed.
+- `:app:assembleDebug` passed and produced `app/build/outputs/apk/debug/app-debug.apk`.
+- Before installation, the Vivo had no Firebase Sync preference file, so the setting defaulted OFF. Source and migration checks confirm workers exit before Firebase initialization while OFF and all preexisting reports migrate as ineligible. The APK was installed with `adb install -r` (no app data was cleared), launched with `monkey`, and the app process remained running; no startup crash/ANR markers were found. Sync remained OFF/unset afterward.
+- No live Firebase synchronization, production Firestore writes, or rules deployment was attempted.
+- Existing previously recorded physical results remain historical: an earlier connected session reported CameraX, MapTiler rendering, panning, app install/launch, and 12 Android tests; those results were not repeated for this sync change. Pinch zoom, map location centering, and production Firebase behavior remain unverified.
+- Do not infer field reliability or offline basemap support from these tests. Room remains the local source of truth; cloud sync behavior with a real Firebase project is not verified.
 
 ## Manual reporting verification still required
 
@@ -90,9 +87,17 @@ Target device: Vivo V2430, Android 15 (API 35). Use the same APK, local model fi
 
 The UI's observed processed FPS is completed inference throughput over elapsed sampling windows, not camera capture FPS. The processing-only rate estimate divides frames by their measured processing duration and excludes callback gaps; it is not end-to-end throughput. No controlled benchmark result is currently recorded.
 
-## Synchronization status
+## Firebase synchronization verification and safety
 
-The research objectives mention exploring synchronization when connectivity returns. No authorized server, endpoint, credentials, or idempotent upload contract is configured in ROADAR, so synchronization is blocked and not implemented. Reports remain local and are not deleted or changed because connectivity changes. Supply the approved backend/API contract before implementing uploads, retries, or WorkManager.
+The implementation has focused JVM tests for bounded batches, deterministic-ID retries after a simulated lost acknowledgment, permanent report rejection, identity mismatch, and delete/upload ordering. Firestore rules have six emulator cases for owner access, unauthenticated/other-owner denial, schema validation, and immutable report contents. These are local tests and do not verify deployed rules, Firebase Auth setup, quotas, or real network retries.
+
+Before any real-project test:
+
+1. Use a Firebase project explicitly authorized for ROADAR testing. Enable anonymous authentication and review/deploy `firestore.rules` to that project manually.
+2. Confirm you intend to upload every locally pending report. On app entry, ROADAR schedules synchronization when the local Firebase configuration is present; report data includes UUID, latitude/longitude, confidence, detection/creation timestamps, and horizontal accuracy.
+3. Use a dedicated test install or ensure the report set contains only approved test data. Do not clear application data to resolve identity mismatch; the implementation intentionally blocks changed/missing identities.
+4. Verify successful upload, offline retry, deletion tombstone processing, and persistence with only test reports. Confirm the corresponding owner-scoped documents in the Firebase console, then test deletion and check that the remote document is gone.
+5. Do not call the sync a successful production test unless it was verified against the intended project/device. No production operations were performed during the current verification.
 
 ### Map provider research and offline boundaries
 

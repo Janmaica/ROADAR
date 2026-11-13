@@ -10,8 +10,9 @@ ROADAR is a single Android app module with one `ComponentActivity` and a Jetpack
 - `ui/camera/` contains the lifecycle-bound CameraX Preview/ImageAnalysis controller, `PreviewView` host, and detection overlay.
 - `ai/` contains the ONNX Runtime adapter, camera preprocessor, output decoder/NMS, and detection session.
 - `data/report/` contains the Room entity, DAO, repository, database, and manual-report factory.
+- `data/sync/` contains the anonymous Firebase identity provider, Firestore adapter, sync coordinator, Room outbox adapter, and WorkManager scheduler/worker.
 - `location/` contains the fused-device-location provider and location-fix validation.
-- `app/schemas/com.roadar.app.data.report.RoadarDatabase/1.json` is the exported Room schema.
+- `app/schemas/com.roadar.app.data.report.RoadarDatabase/` contains exported Room schemas v1 through v3.
 
 The app does not use a navigation library or ViewModels. Existing top-level screen state remains local Compose state; repositories expose `Flow` and suspend APIs, and Room performs database work asynchronously on its executors/IO dispatcher. A ViewModel layer can be introduced when state needs to survive beyond screen composition.
 
@@ -27,7 +28,7 @@ The reported coordinates are the **device position associated with a detection e
 
 ## Room report storage
 
-Room database: `roadar-reports.db`; schema version 1. The entity `PotholeReport` stores:
+Room database: `roadar-reports.db`; schema version 3. The entity `PotholeReport` stores:
 
 | Field | Meaning |
 |---|---|
@@ -43,10 +44,21 @@ Room database: `roadar-reports.db`; schema version 1. The entity `PotholeReport`
 | `reportingMode` | `MANUAL` for new reports; the legacy `AUTOMATIC` enum value remains readable for existing schema-v1 rows |
 | `synchronizationStatus` | `PENDING`, `SYNCED`, or `FAILED` |
 | `imageReference` | Nullable; no image capture is implemented |
+| `syncEligible` | False for existing reports; true only for reports created while Firebase Sync is enabled |
 
-Entity construction validates UUID, timestamps, coordinate ranges, accuracy, confidence, and model metadata. The DAO supports insert, ordered observation/query, lookup, delete, and sync-status update. Repository suspend operations dispatch through `Dispatchers.IO`; observers are flows. There is no destructive migration fallback. Version 1 is the initial schema; future schema changes must add and test explicit migrations before release. The application creates manual reports only. The old enum value and converter are retained to read historical rows without changing the schema or invalidating saved data.
+Entity construction validates UUID, timestamps, coordinate ranges, accuracy, confidence, and model metadata. The DAO supports insert, ordered observation/query, lookup, delete, sync eligibility, and outbox operations. Repository suspend operations dispatch through `Dispatchers.IO`; observers are flows. Explicit v1→v2 and v2→v3 migrations preserve existing report data; there is no destructive migration fallback. Existing reports receive `syncEligible = false`, and reports created while sync is off remain local-only. The application creates manual reports only. The legacy enum value and converter remain available for historical rows.
 
-The local database does not require network access by design. Instrumentation tests cover insert/query/observe/update/delete and persistence after closing/reopening a file-backed test database. A dedicated airplane-mode end-to-end app test has not been performed. No synchronization worker or backend is implemented.
+The local database does not require network access by design. The v1→v2 migration adds a singleton Firebase-owner state table and durable deletion-outbox table/index without modifying or deleting report rows. The v2→v3 migration adds a per-report `syncEligible` flag with a default of false. Instrumentation migration tests verify a schema-v1 report remains present and ineligible after migration to v3, and that eligible deletion tombstones persist.
+
+### Optional Firebase synchronization
+
+Synchronization requires a configured `app/google-services.json` and the persistent Firebase Sync switch in Settings, which defaults OFF. Enabling requires confirmation. Existing reports stay ineligible; only reports inserted while the setting is ON can be uploaded. Startup scheduling and workers recheck the setting before Firebase initialization or remote operations, so OFF prevents authentication, uploads, and remote deletions. A configured build requires Firebase anonymous authentication and manually publishing the provided `firestore.rules`; rules are not deployed automatically. The application stores only the bound anonymous UID in the Room singleton state row and blocks if the Firebase identity is missing or changes after binding.
+
+Eligible post-opt-in reports are uploaded under `users/{uid}/reports/{reportId}`, with the existing report UUID as the deterministic Firestore document ID. The payload is limited to report ID, latitude/longitude, confidence, detection/creation timestamps, and horizontal location accuracy. WorkManager waits for connectivity, retries transient failures with exponential backoff, and processes bounded batches. Room marks an upload `SYNCED` only after a server read-back. Permanent report-specific rejections mark that report `FAILED`; the Reports screen offers retry. Other local report fields remain on-device.
+
+Deleting an eligible report is a Room transaction that removes the row and adds a durable tombstone. Tombstones are retained while sync is OFF and processed before eligible uploads when sync is re-enabled, preventing stale uploads from recreating a locally deleted cloud report. Deleting a local-only report does not create a remote deletion. Tombstones clear only after the remote delete is acknowledged and verified. The anonymous Firebase identity and remote data have no in-app account-recovery or account-deletion flow; developers must consider project retention and user-data policies before enabling cloud sync.
+
+Firebase sync unit tests cover bounded batches, deterministic-ID retries after a simulated lost acknowledgment, rejected records, identity mismatch, and upload/delete races. Firestore Emulator rules tests run only against a `demo-` project and do not touch production data. No live Firebase project, production rules deployment, phone sync, or cloud-data migration has been tested.
 
 ## Foreground location
 
@@ -70,14 +82,14 @@ The map observes `PotholeReportRepository.observeReports()` and creates/removes 
 
 MapLibre Native Android is BSD-2-Clause-licensed and exposes offline region APIs, but is a renderer rather than a data provider. MapTiler's documented Maps API permits online display under its terms and subscription limits; its terms reviewed for this task prohibit bulk downloading/export without a separate agreement. The public OpenStreetMap tile service prohibits bulk downloads/prefetch. ROADAR performs no tile prefetch, download, or offline-region creation.
 
-Camera preview, model inference, and Room storage are local and do not call a remote inference or report service. Manual saving still requires a valid fresh device location; an offline GPS fix depends on the device and environment and is not guaranteed. Online basemap rendering requires internet and a user-provided MapTiler key. A key was configured only in the ignored local `local.properties` for device verification; no credential is stored in the repository. The Streets v4 basemap rendered on the connected phone and panning was verified. Basemap tiles are not available in airplane mode. Room reports remain stored and accessible offline in Reports and in the map screen's local report-detail list; this is offline report storage, not offline mapping. An end-to-end airplane-mode test has not been run.
+Camera preview, model inference, and Room storage are local. When Firebase sync is enabled, report metadata is sent to the configured Firebase project as described above; no image, model, or image-reference is uploaded. Manual saving still requires a valid fresh device location; an offline GPS fix depends on the device and environment and is not guaranteed. Online basemap rendering requires internet and a user-provided MapTiler key. A key was configured only in the ignored local `local.properties` for device verification; no credential is stored in the repository. The Streets v4 basemap rendered on the connected phone and panning was verified. Basemap tiles are not available in airplane mode. Room reports remain stored and accessible offline in Reports and in the map screen's local report-detail list; this is offline report storage, not offline mapping. An end-to-end airplane-mode test has not been run.
 
-## Synchronization and future boundaries
+## Future boundaries
 
 1. Keep Compose screens focused on rendering and user actions; introduce screen ViewModels if lifecycle requirements grow.
 2. Keep `PotholeReportRepository` as the boundary for report query/update use cases.
 3. Configure and physically verify the online MapTiler map with an app-restricted key; select a separately licensed offline source only if offline basemaps become a requirement.
-4. Research objectives mention synchronization when connectivity returns, but no authorized backend, endpoint, credentials, or upload contract exists in this project. Synchronization is therefore blocked and is not implemented. Do not invent a destination; obtain the approved service details before designing retries or adding WorkManager.
+4. Before enabling Firebase for real users, verify project ownership/authorization, anonymous-auth policy, published rules, privacy notices, retention, recovery, and remote-account deletion requirements. Sync requires explicit in-app opt-in; account recovery and remote-account deletion flows are not implemented.
 5. Evaluate inference, geolocation error, privacy, battery use, offline behavior, and field limitations on representative devices.
 
 The architecture is a research prototype, not a road-safety or surveyed infrastructure system.

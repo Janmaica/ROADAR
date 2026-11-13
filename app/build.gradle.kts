@@ -7,6 +7,11 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+val firebaseConfigFile = file("google-services.json")
+if (firebaseConfigFile.exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 val localProperties = Properties().apply {
     val localPropertiesFile = rootProject.file("local.properties")
     if (localPropertiesFile.exists()) {
@@ -22,6 +27,7 @@ ksp {
 android {
     namespace = "com.roadar.app"
     compileSdk = 36
+    sourceSets["androidTest"].assets.srcDir("$projectDir/schemas")
 
     defaultConfig {
         applicationId = "com.roadar.app"
@@ -29,6 +35,11 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
+        buildConfigField(
+            "Boolean",
+            "FIREBASE_CONFIGURED",
+            firebaseConfigFile.exists().toString()
+        )
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -70,6 +81,12 @@ dependencies {
     implementation(libs.play.services.location)
     implementation(libs.maplibre.android)
     implementation(libs.okhttp)
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.auth)
+    implementation(libs.firebase.firestore)
+    implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.kotlinx.coroutines.play.services)
+    implementation(libs.guava)
     ksp(libs.androidx.room.compiler)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)

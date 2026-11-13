@@ -1,6 +1,7 @@
 package com.roadar.app
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
@@ -64,5 +65,24 @@ class RoadarNavigationTest {
                 .fetchSemanticsNodes()
                 .isEmpty()
         )
+    }
+
+    @Test
+    fun firebaseSyncStartsOffAndEnableRequiresConfirmation() {
+        composeRule.onNodeWithTag("navigation_settings").performClick()
+        val syncSwitch = composeRule.onNodeWithTag("firebase_sync_switch")
+        syncSwitch.assertIsOff()
+
+        if (BuildConfig.FIREBASE_CONFIGURED) {
+            syncSwitch.performClick()
+            composeRule.onNodeWithText("Enable Firebase Sync?").assertIsDisplayed()
+            composeRule.onNodeWithText(
+                "Only reports created after you enable sync may be uploaded. " +
+                    "Existing reports will remain local. New eligible report details " +
+                    "and later deletions will sync to the configured Firebase project."
+            ).assertIsDisplayed()
+            composeRule.onNodeWithText("Cancel").performClick()
+            syncSwitch.assertIsOff()
+        }
     }
 }

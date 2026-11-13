@@ -1,0 +1,56 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    function validReport(reportId, report) {
+      return report.keys().hasAll([
+          'reportId',
+          'latitude',
+          'longitude',
+          'confidence',
+          'detectedAt',
+          'createdAt',
+          'locationAccuracy'
+        ])
+        && report.keys().hasOnly([
+          'reportId',
+          'latitude',
+          'longitude',
+          'confidence',
+          'detectedAt',
+          'createdAt',
+          'locationAccuracy'
+        ])
+        && report.reportId is string
+        && report.reportId == reportId
+        && report.latitude is number
+        && report.latitude >= -90
+        && report.latitude <= 90
+        && report.longitude is number
+        && report.longitude >= -180
+        && report.longitude <= 180
+        && report.confidence is number
+        && report.confidence >= 0
+        && report.confidence <= 1
+        && report.detectedAt is timestamp
+        && report.createdAt is timestamp
+        && report.locationAccuracy is number
+        && report.locationAccuracy >= 0
+        && report.locationAccuracy <= 1000;
+    }
+
+    match /users/{userId}/reports/{reportId} {
+      allow create: if isOwner(userId)
+        && validReport(reportId, request.resource.data);
+      allow read: if isOwner(userId);
+      allow update: if isOwner(userId)
+        && validReport(reportId, request.resource.data)
+        && request.resource.data == resource.data;
+      allow delete: if isOwner(userId);
+    }
+  }
+}
