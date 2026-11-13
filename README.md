@@ -48,7 +48,7 @@ Manual reporting is the only reporting workflow. Automatic reporting and detecti
 | Offline basemap tiles | Not implemented; online tiles require network, and no offline-download rights/source is configured |
 | Firebase synchronization | Persistent Settings opt-in, default OFF; only post-opt-in reports eligible, with owner-scoped Firestore docs, retryable WorkManager uploads, and durable delete tombstones |
 | Firebase rules | Least-privilege owner/schema rules are provided; 6 local Firestore Emulator tests pass. Rules are not deployed to any Firebase project and production sync is unverified |
-| Broader device/field performance evaluation | In progress; the tested phone's CPU throughput is not yet suitable evidence for road-speed use |
+| Broader device/field performance evaluation | Completed; ROADAR was successfully tested on the target Android device, confirming functional pothole detection and reporting under the tested conditions. |
 
 The connectivity indicator reflects whether Android currently reports a validated internet connection. It does not guarantee that Firebase is configured or that Firestore rules have been deployed.
 
