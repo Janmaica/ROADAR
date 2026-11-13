@@ -1,6 +1,8 @@
-# ROADAR
+<p align="center">
+  <img src="docs/assets/roadar-logo.png" alt="ROADAR Official Logo" width="250">
+</p>
 
-![ROADAR roadway detection logo](docs/assets/roadar-logo.svg)
+# ROADAR
 
 **Development and Evaluation of an Offline-Capable Android Application for Pothole Detection Using a Fine-Tuned YOLO26n Model**
 

@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -23,8 +22,10 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.ui.draw.clip
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
@@ -49,7 +50,7 @@ fun RoadarTopBar(isOnline: Boolean) {
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            RoadarLogo(modifier = Modifier.size(42.dp))
+            RoadarLogo(modifier = Modifier.size(52.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "ROADAR",
@@ -70,19 +71,12 @@ fun RoadarTopBar(isOnline: Boolean) {
 
 @Composable
 fun RoadarLogo(modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier.background(
-            MaterialTheme.colorScheme.primary,
-            RoundedCornerShape(13.dp)
-        ),
-        contentAlignment = Alignment.Center
-    ) {
-        Image(
-            painter = painterResource(R.drawable.ic_launcher_foreground),
-            contentDescription = "ROADAR roadway detection logo",
-            modifier = Modifier.fillMaxSize()
-        )
-    }
+    Image(
+        painter = painterResource(R.drawable.roadar_official_logo),
+        contentDescription = "ROADAR official logo",
+        contentScale = ContentScale.Crop,
+        modifier = modifier.clip(RoundedCornerShape(13.dp))
+    )
 }
 
 @Composable

@@ -137,7 +137,7 @@ private fun DetectionIntroCard(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
             ) {
-                RoadarLogo(modifier = Modifier.size(48.dp))
+                RoadarLogo(modifier = Modifier.size(56.dp))
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
                         text = "ROAD CONDITION RESEARCH",
